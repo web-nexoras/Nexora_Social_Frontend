@@ -2,6 +2,7 @@ import api from "./axios";
 
 export const usersApi = {
   list: (params) => api.get("/users", { params }),
+  admins: () => api.get("/users/admins"),
   get: (id) => api.get(`/users/${id}`),
   approve: (id) => api.patch(`/users/${id}/approve`),
   reject: (id) => api.patch(`/users/${id}/reject`),

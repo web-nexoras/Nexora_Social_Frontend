@@ -7,6 +7,7 @@ export default function Groups() {
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
+  const [confirmGroup, setConfirmGroup] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -73,7 +74,7 @@ export default function Groups() {
                   Open Chat
                 </a>
               ) : (
-                <button onClick={() => subscribe(g._id)} className="flex-1 px-4 py-2 rounded-lg bg-accent text-white font-semibold hover:bg-cyan-600 transition">
+                <button onClick={() => setConfirmGroup(g)} className="flex-1 px-4 py-2 rounded-lg bg-accent text-white font-semibold hover:bg-cyan-600 transition">
                   Subscribe to Join
                 </button>
               )}
@@ -82,6 +83,39 @@ export default function Groups() {
         ))}
       </div>
       {groups.length === 0 && <p className="text-center text-slate-500 mt-10">No groups available</p>}
+
+      {/* Subscription popup */}
+      {confirmGroup && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
+            <h3 className="text-xl font-bold text-brand mb-3">Subscribe to Join</h3>
+            <p className="text-slate-600 mb-4">
+              To join <strong>{confirmGroup.name}</strong>, you need an active subscription.
+              Click below to proceed to secure payment.
+            </p>
+            <p className="text-sm text-slate-500 mb-6">
+              After successful payment, admin will add you to the group.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  subscribe(confirmGroup._id);
+                  setConfirmGroup(null);
+                }}
+                className="flex-1 px-4 py-2 rounded-lg bg-accent text-white font-semibold hover:bg-cyan-600 transition"
+              >
+                Proceed to Payment
+              </button>
+              <button
+                onClick={() => setConfirmGroup(null)}
+                className="flex-1 px-4 py-2 rounded-lg bg-slate-200 text-slate-700 font-semibold hover:bg-slate-300 transition"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

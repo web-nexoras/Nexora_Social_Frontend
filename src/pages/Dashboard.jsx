@@ -1,23 +1,30 @@
 import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import api from "../api/axios";
+import { friendsApi } from "../api/friendsApi";
+import { usersApi } from "../api/usersApi";
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const isAdmin = user?.role === "admin";
   const [stats, setStats] = useState({ friends: 0, conversations: 0, groups: 0, pendingRequests: 0, totalUsers: 0, pendingApprovals: 0 });
   const [recent, setRecent] = useState([]);
+  const [allUsers, setAllUsers] = useState([]);
+  const [incoming, setIncoming] = useState([]);
+  const [suggestions, setSuggestions] = useState([]);
 
   useEffect(() => {
     const load = async () => {
       try {
-        const [f, c, g, inc, u] = await Promise.all([
-          api.get("/friends").catch(() => ({ data: { friends: [] } })),
-          api.get("/chat/conversations").catch(() => ({ data: { conversations: [] } })),
-          api.get("/groups").catch(() => ({ data: { groups: [] } })),
-          api.get("/friends/requests/incoming").catch(() => ({ data: { requests: [] } })),
-          isAdmin ? api.get("/users").catch(() => ({ data: { users: [], total: 0 } })) : Promise.resolve({ data: { users: [], total: 0 } }),
+        const [f, c, g, inc, u, s] = await Promise.all([
+          api.get("/friends"),
+          api.get("/chat/conversations"),
+          api.get("/groups"),
+          api.get("/friends/requests/incoming"),
+          isAdmin ? usersApi.list() : Promise.resolve({ data: { users: [], total: 0 } }),
+          friendsApi.suggestions(),
         ]);
         setStats({
           friends: (f.data?.friends || []).length,
@@ -28,6 +35,9 @@ export default function Dashboard() {
           pendingApprovals: (u.data?.users || []).filter((x) => !x.isApproved).length,
         });
         setRecent((c.data?.conversations || []).slice(0, 5));
+        setIncoming(inc.data?.requests || []);
+        setSuggestions(s.data?.users || []);
+        if (isAdmin) setAllUsers(u.data?.users || []);
       } catch (e) {
         console.error(e);
       }
@@ -35,21 +45,48 @@ export default function Dashboard() {
     load();
   }, [isAdmin]);
 
-  const userCards = [
-    { label: "Friends", value: stats.friends, color: "from-indigo-500 to-brand", to: "/friends" },
-    { label: "Conversations", value: stats.conversations, color: "from-cyan-500 to-accent", to: "/chat" },
-    { label: "Groups", value: stats.groups, color: "from-emerald-500 to-green-500", to: "/groups" },
-    { label: "Pending Requests", value: stats.pendingRequests, color: "from-amber-500 to-orange-500", to: "/friends" },
-  ];
+  const accept = async (id) => {
+    await friendsApi.accept(id);
+    setIncoming((prev) => prev.filter((r) => r._id !== id));
+    setStats((s) => ({ ...s, pendingRequests: Math.max(0, s.pendingRequests - 1), friends: s.friends + 1 }));
+  };
 
-  const adminCards = [
-    { label: "Total Users", value: stats.totalUsers, color: "from-indigo-500 to-brand", to: "/admin/users" },
-    { label: "Pending Approvals", value: stats.pendingApprovals, color: "from-amber-500 to-orange-500", to: "/admin/users" },
-    { label: "Groups", value: stats.groups, color: "from-emerald-500 to-green-500", to: "/admin/groups" },
-    { label: "Conversations", value: stats.conversations, color: "from-cyan-500 to-accent", to: "/chat" },
-  ];
+  const reject = async (id) => {
+    await friendsApi.reject(id);
+    setIncoming((prev) => prev.filter((r) => r._id !== id));
+    setStats((s) => ({ ...s, pendingRequests: Math.max(0, s.pendingRequests - 1) }));
+  };
 
-  const cards = isAdmin ? adminCards : userCards;
+  const messageAdmin = async () => {
+    try {
+      const res = await usersApi.admins();
+      const admins = res.data?.admins || [];
+      if (admins.length > 0) {
+        navigate(`/chat?user=${admins[0]._id}`);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const sendSuggestionRequest = async (userId) => {
+    await friendsApi.sendRequest(userId);
+    setSuggestions((prev) => prev.filter((u) => u._id !== userId));
+  };
+
+  const cards = isAdmin
+    ? [
+        { label: "Total Users", value: stats.totalUsers, color: "from-indigo-500 to-brand", to: "/admin/users" },
+        { label: "Pending Approvals", value: stats.pendingApprovals, color: "from-amber-500 to-orange-500", to: "/admin/users" },
+        { label: "Groups", value: stats.groups, color: "from-emerald-500 to-green-500", to: "/admin/groups" },
+        { label: "Conversations", value: stats.conversations, color: "from-cyan-500 to-accent", to: "/chat" },
+      ]
+    : [
+        { label: "Friends", value: stats.friends, color: "from-indigo-500 to-brand", to: "/friends" },
+        { label: "Conversations", value: stats.conversations, color: "from-cyan-500 to-accent", to: "/chat" },
+        { label: "Groups", value: stats.groups, color: "from-emerald-500 to-green-500", to: "/groups" },
+        { label: "Pending Requests", value: stats.pendingRequests, color: "from-amber-500 to-orange-500", to: "/friends" },
+      ];
 
   return (
     <div className="space-y-6">
@@ -81,6 +118,95 @@ export default function Dashboard() {
         ))}
       </div>
 
+      {/* Incoming friend requests (user only) */}
+      {!isAdmin && incoming.length > 0 && (
+        <div className="bg-white rounded-2xl shadow p-6">
+          <h2 className="text-xl font-bold text-brand mb-4">Friend Requests</h2>
+          <div className="space-y-3">
+            {incoming.map((r) => (
+              <div key={r._id} className="flex items-center justify-between p-3 rounded-xl bg-slate-50">
+                <div className="flex items-center gap-3">
+                  <img src={r.sender?.avatar || "https://via.placeholder.com/40"} alt={r.sender?.fullname} className="w-10 h-10 rounded-full object-cover" />
+                  <div>
+                    <p className="font-medium text-slate-800">{r.sender?.fullname}</p>
+                    <p className="text-xs text-slate-400">{r.sender?.email}</p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => accept(r._id)} className="px-3 py-1.5 rounded-lg bg-green-500 text-white text-sm font-medium hover:bg-green-600 transition">
+                    Accept
+                  </button>
+                  <button onClick={() => reject(r._id)} className="px-3 py-1.5 rounded-lg bg-red-500 text-white text-sm font-medium hover:bg-red-600 transition">
+                    Reject
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Friend Suggestions (user only) */}
+      {!isAdmin && suggestions.length > 0 && (
+        <div className="bg-white rounded-2xl shadow p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-brand">Friend Suggestions</h2>
+            <Link to="/friends" className="text-sm text-brand font-medium hover:underline">View all →</Link>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {suggestions.slice(0, 6).map((u) => (
+              <div key={u._id} className="bg-slate-50 rounded-xl p-4 hover:shadow transition">
+                <div className="flex items-center gap-3 mb-3">
+                  <img src={u.avatar || "https://via.placeholder.com/40"} alt={u.fullname} className="w-10 h-10 rounded-full object-cover" />
+                  <div>
+                    <p className="font-medium text-slate-800 text-sm">{u.fullname}</p>
+                    <p className="text-xs text-slate-400 truncate">{u.email}</p>
+                  </div>
+                </div>
+                <button onClick={() => sendSuggestionRequest(u._id)} className="w-full py-1.5 rounded-lg bg-brand text-white text-sm font-medium hover:bg-indigo-700 transition">
+                  Add Friend
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* All users (admin only) */}
+      {isAdmin && (
+        <div className="bg-white rounded-2xl shadow p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-brand">All Users</h2>
+            <Link to="/admin/users" className="text-sm text-brand font-medium hover:underline">Manage →</Link>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50">
+                <tr>
+                  <th className="text-left px-4 py-3">Name</th>
+                  <th className="text-left px-4 py-3">Email</th>
+                  <th className="text-left px-4 py-3">Role</th>
+                  <th className="text-left px-4 py-3">Approved</th>
+                  <th className="text-left px-4 py-3">Active</th>
+                </tr>
+              </thead>
+              <tbody>
+                {allUsers.map((u) => (
+                  <tr key={u._id} className="border-t">
+                    <td className="px-4 py-3">{u.fullname}</td>
+                    <td className="px-4 py-3">{u.email}</td>
+                    <td className="px-4 py-3">{u.role}</td>
+                    <td className="px-4 py-3">{u.isApproved ? "✓" : "✗"}</td>
+                    <td className="px-4 py-3">{u.isActive ? "✓" : "✗"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {allUsers.length === 0 && <p className="text-center text-slate-500 py-6">No users found</p>}
+          </div>
+        </div>
+      )}
+
       {/* Quick actions */}
       <div className="bg-white rounded-2xl shadow p-6">
         <h2 className="text-xl font-bold text-brand mb-4">Quick Actions</h2>
@@ -90,6 +216,7 @@ export default function Dashboard() {
           <Link to="/chat" className="px-4 py-2 rounded-lg bg-slate-800 text-white font-semibold hover:bg-slate-900 transition">Chat</Link>
           <Link to="/groups" className="px-4 py-2 rounded-lg bg-slate-200 text-slate-700 font-semibold hover:bg-slate-300 transition">Groups</Link>
           <Link to="/payments" className="px-4 py-2 rounded-lg bg-emerald-500 text-white font-semibold hover:bg-emerald-600 transition">Payments</Link>
+          <button onClick={messageAdmin} className="px-4 py-2 rounded-lg bg-rose-500 text-white font-semibold hover:bg-rose-600 transition">Message Admin</button>
           {isAdmin && (
             <>
               <Link to="/admin/users" className="px-4 py-2 rounded-lg bg-amber-500 text-white font-semibold hover:bg-amber-600 transition">Admin Users</Link>

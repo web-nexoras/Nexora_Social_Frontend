@@ -85,8 +85,8 @@ export default function AdminUsers() {
 
       {loading && <p className="text-center text-slate-400">Loading...</p>}
 
-      <div className="bg-white rounded-2xl shadow overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="bg-white rounded-2xl shadow overflow-x-auto">
+        <table className="w-full text-sm min-w-[640px]">
           <thead className="bg-slate-50">
             <tr>
               <th className="text-left px-4 py-3">Name</th>

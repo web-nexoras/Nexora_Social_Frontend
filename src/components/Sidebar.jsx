@@ -9,13 +9,13 @@ const linkClass = ({ isActive }) =>
       : "text-slate-700 hover:bg-indigo-50 hover:text-brand"
   }`;
 
-export default function Sidebar() {
+export default function Sidebar({ onNavigate }) {
   const { user } = useAuth();
 
   return (
-    <aside className="bg-white rounded-lg shadow p-4 sticky top-16 h-[calc(100vh-4rem)] overflow-y-auto">
+    <aside className="bg-white shadow p-4 min-h-screen overflow-y-auto" onClick={onNavigate}>
       <div className="mb-6">
-        <h2 className="text-lg font-bold text-brand">Nexora Social</h2>
+        <h2 className="text-lg font-bold text-brand">{user?.role === "admin" ? "Nexora Social Admin" : "Nexora Social"}</h2>
         <p className="text-xs text-slate-400 mt-1">
           {user?.role === "admin" ? "Admin" : "User"}
         </p>
@@ -54,3 +54,4 @@ export default function Sidebar() {
     </aside>
   );
 }
+

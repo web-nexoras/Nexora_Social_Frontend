@@ -36,7 +36,7 @@ export default function Navbar() {
   return (
     <nav className="bg-white/80 backdrop-blur shadow-sm sticky top-0 z-50">
       <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
-        <Link to="/" className="text-2xl font-bold text-brand shrink-0">Nexora Social</Link>
+
 
         {user && (
           <form onSubmit={handleSearch} className="flex-1 max-w-md relative">
