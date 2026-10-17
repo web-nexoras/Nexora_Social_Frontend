@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { chatApi } from "../api/chatApi";
 import { groupsApi, paymentsApi } from "../api/groupsApi";
+import { usersApi } from "../api/usersApi";
 import { io } from "socket.io-client";
 
 const SOCKET_URL = import.meta.env.VITE_API_URL?.replace("/api/v1", "") || "http://localhost:5000";
@@ -12,6 +13,7 @@ export default function Chat() {
   const targetUserId = searchParams.get("user");
   const convParam = searchParams.get("conversation");
   const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
 
   const [conversations, setConversations] = useState([]);
   const [activeId, setActiveId] = useState(null);
@@ -26,6 +28,12 @@ export default function Chat() {
   const [showSubscribe, setShowSubscribe] = useState(false);
   const [subscribing, setSubscribing] = useState(false);
   const [subscribeMsg, setSubscribeMsg] = useState("");
+  const [activeGroup, setActiveGroup] = useState(null);
+  const [showAddMember, setShowAddMember] = useState(false);
+  const [memberQuery, setMemberQuery] = useState("");
+  const [memberResults, setMemberResults] = useState([]);
+  const [memberMsg, setMemberMsg] = useState("");
+  const [adding, setAdding] = useState(false);
   const socketRef = useRef(null);
   const bottomRef = useRef(null);
 
@@ -100,21 +108,34 @@ export default function Chat() {
     let alive = true;
     if (!activeId) {
       setLockedGroup(null);
+      setActiveGroup(null);
       return;
     }
+    // Reset the add-member panel when switching conversations
+    setShowAddMember(false);
+    setMemberQuery("");
+    setMemberResults([]);
+    setMemberMsg("");
     (async () => {
       try {
         const res = await groupsApi.byConversation(activeId);
         if (!alive) return;
-        if (res.data?.isMember) {
+        const group = res.data?.group || null;
+        setActiveGroup(group);
+        const isAdmin = user?.role === "admin";
+        if (res.data?.isMember || isAdmin) {
+          // Admin can always view/moderate any group
           setLockedGroup(null);
         } else {
-          setLockedGroup(res.data.group);
+          setLockedGroup(group);
           setShowSubscribe(true);
         }
       } catch (e) {
         // Not a group conversation (direct chat) — nothing locked
-        if (alive) setLockedGroup(null);
+        if (alive) {
+          setLockedGroup(null);
+          setActiveGroup(null);
+        }
       }
     })();
     return () => {
@@ -162,6 +183,21 @@ export default function Chat() {
       setMessages((prev) => prev.filter((m) => m._id !== messageId));
     });
 
+    // A conversation was deleted (by admin or a participant) — drop it from the list
+    socket.on("conversation:deleted", ({ conversationId }) => {
+      setConversations((prev) => prev.filter((c) => c._id !== conversationId));
+      setUnreadIds((prev) => {
+        const next = new Set(prev);
+        next.delete(conversationId);
+        return next;
+      });
+      if (conversationId === activeId) {
+        setActiveId(null);
+        setMessages([]);
+        setMobileView("list");
+      }
+    });
+
     return () => socket.disconnect();
   }, [activeId]);
 
@@ -206,6 +242,66 @@ export default function Chat() {
       setSubscribeMsg(e?.response?.data?.message || "Subscription failed");
     } finally {
       setSubscribing(false);
+    }
+  };
+
+  const removeMessage = async (messageId) => {
+    try {
+      await chatApi.deleteMessage(messageId);
+      setMessages((prev) => prev.filter((m) => m._id !== messageId));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const removeConversation = async (c) => {
+    const label = c.type === "group" ? c.groupName : "this conversation";
+    if (!window.confirm(`Delete "${label}" and all of its messages? This cannot be undone.`)) return;
+    try {
+      await chatApi.deleteConversation(c._id);
+      setConversations((prev) => prev.filter((x) => x._id !== c._id));
+      if (activeId === c._id) {
+        setActiveId(null);
+        setMessages([]);
+        setMobileView("list");
+      }
+      setToast("Conversation deleted");
+      setTimeout(() => setToast(""), 2500);
+    } catch (e) {
+      console.error(e);
+      setToast(e?.response?.data?.message || "Failed to delete conversation");
+      setTimeout(() => setToast(""), 2500);
+    }
+  };
+
+  const searchMembers = async (q) => {
+    setMemberQuery(q);
+    if (!q.trim()) {
+      setMemberResults([]);
+      return;
+    }
+    try {
+      const res = await usersApi.search(q.trim());
+      setMemberResults(res.data?.users || []);
+    } catch (e) {
+      setMemberResults([]);
+    }
+  };
+
+  const addMemberToGroup = async (userId) => {
+    if (!activeGroup) return;
+    setAdding(true);
+    setMemberMsg("");
+    try {
+      const res = await groupsApi.addMembers(activeGroup._id, [userId]);
+      const added = res.data?.addedCount ?? 0;
+      setMemberMsg(added > 0 ? "✅ Member added to the group for free" : "✅ Already a member of this group");
+      setMemberQuery("");
+      setMemberResults([]);
+    } catch (e) {
+      setMemberMsg(e?.response?.data?.message || "Failed to add member");
+    } finally {
+      setAdding(false);
     }
   };
 
@@ -264,6 +360,57 @@ export default function Chat() {
           </div>
         </div>
       )}
+
+      {/* Admin: add a member to this group from inside the chat */}
+      {showAddMember && activeGroup && (
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
+            <div className="w-12 h-12 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center text-2xl mb-3">
+              ➕
+            </div>
+            <h3 className="text-xl font-bold text-brand mb-1">Add member</h3>
+            <p className="text-sm text-slate-500 mb-4">
+              Adding to <strong>{activeGroup.name}</strong> — free, no payment needed.
+            </p>
+            <input
+              value={memberQuery}
+              onChange={(e) => searchMembers(e.target.value)}
+              placeholder="Search by name or email..."
+              className="w-full px-4 py-2 border rounded-lg mb-3 focus:ring-2 focus:ring-brand"
+            />
+            <div className="max-h-40 overflow-y-auto space-y-2 mb-3">
+              {memberResults.length === 0 && (
+                <p className="text-sm text-slate-400 text-center py-2">
+                  {memberQuery ? "No users found" : "Type to search users"}
+                </p>
+              )}
+              {memberResults.map((u) => (
+                <div key={u._id} className="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2">
+                  <img src={u.avatar || "https://via.placeholder.com/32"} alt="" className="w-7 h-7 rounded-full object-cover" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-800 truncate">{u.fullname}</p>
+                    <p className="text-xs text-slate-400 truncate">{u.email}</p>
+                  </div>
+                  <button
+                    onClick={() => addMemberToGroup(u._id)}
+                    disabled={adding}
+                    className="text-xs px-3 py-1 rounded bg-brand text-white hover:bg-slate-700 disabled:opacity-60"
+                  >
+                    Add
+                  </button>
+                </div>
+              ))}
+            </div>
+            {memberMsg && <p className="text-sm text-slate-700 mb-3">{memberMsg}</p>}
+            <button
+              onClick={() => setShowAddMember(false)}
+              className="w-full px-4 py-2 rounded-lg bg-slate-200 text-slate-700 font-semibold hover:bg-slate-300 transition"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
       <div className="flex flex-col md:grid md:grid-cols-3 gap-6">
         {/* Conversation list */}
         <div className={`bg-white rounded-2xl shadow p-4 md:col-span-1 max-h-48 md:max-h-none md:h-[70vh] overflow-y-auto ${mobileView === "chat" ? "hidden md:block" : "block"}`}>
@@ -273,7 +420,7 @@ export default function Chat() {
             const other = c.type === "group" ? null : c.participants?.find((p) => p._id !== user?._id);
             const unread = unreadIds.has(c._id);
             return (
-              <button
+              <div
                 key={c._id}
                 onClick={() => {
                   setActiveId(c._id);
@@ -283,7 +430,7 @@ export default function Chat() {
                     return next;
                   });
                 }}
-                className={`w-full text-left p-3 rounded-xl mb-2 transition flex items-center gap-3 ${
+                className={`group/conv w-full text-left p-3 rounded-xl mb-2 transition flex items-center gap-3 cursor-pointer ${
                   unread ? "bg-slate-200 ring-2 ring-slate-400" : activeId === c._id ? "bg-slate-300" : "hover:bg-slate-100"
                 }`}
               >
@@ -294,7 +441,18 @@ export default function Chat() {
                   </p>
                   <p className="text-xs text-slate-400 truncate">{c.lastMessage?.text || "No messages yet"}</p>
                 </div>
-              </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeConversation(c);
+                  }}
+                  title="Delete conversation"
+                  aria-label="Delete conversation"
+                  className="shrink-0 p-1 rounded opacity-0 group-hover/conv:opacity-100 focus:opacity-100 text-slate-900 hover:text-slate-600 font-bold transition"
+                >
+                  🗑
+                </button>
+              </div>
             );
           })}
         </div>
@@ -324,6 +482,14 @@ export default function Chat() {
                 : "Select a conversation"}
               {lockedGroup && <span className="ml-2 text-xs font-semibold text-slate-500">🔒 Not joined</span>}
             </h2>
+            {activeGroup && user?.role === "admin" && (
+              <button
+                onClick={() => setShowAddMember(true)}
+                className="ml-auto shrink-0 text-xs px-3 py-1.5 rounded-lg bg-brand text-white font-semibold hover:bg-slate-700 transition"
+              >
+                + Add Member
+              </button>
+            )}
           </div>
           <div className="flex-1 overflow-y-auto p-6 space-y-4">
             {loading && <p className="text-center text-slate-400">Loading...</p>}
@@ -341,17 +507,28 @@ export default function Chat() {
                     )}
                     <div className="space-y-1">
                       {group.messages.map((m) => (
-                        <div
-                          key={m._id}
-                          className={`px-4 py-2 rounded-2xl transition ${
-                            highlighted.has(m._id)
-                              ? "ring-2 ring-accent bg-accent/10"
-                              : isMe
-                              ? "bg-brand text-white rounded-br-sm"
-                              : "bg-slate-100 text-slate-800 rounded-bl-sm"
-                          }`}
-                        >
-                          {m.text}
+                        <div key={m._id} className="group/msg flex items-center gap-1">
+                          <div
+                            className={`px-4 py-2 rounded-2xl transition ${
+                              highlighted.has(m._id)
+                                ? "ring-2 ring-accent bg-accent/10"
+                                : isMe
+                                ? "bg-brand text-white rounded-br-sm"
+                                : "bg-slate-100 text-slate-800 rounded-bl-sm"
+                            }`}
+                          >
+                            {m.text}
+                          </div>
+                          {(isMe || isAdmin) && (
+                            <button
+                              onClick={() => removeMessage(m._id)}
+                              title="Delete message"
+                              aria-label="Delete message"
+                              className="shrink-0 px-1 opacity-0 group-hover/msg:opacity-100 focus:opacity-100 text-[11px] text-slate-900 hover:text-slate-600 font-bold transition"
+                            >
+                              🗑
+                            </button>
+                          )}
                         </div>
                       ))}
                     </div>
