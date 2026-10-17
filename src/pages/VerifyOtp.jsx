@@ -1,0 +1,44 @@
+import React, { useState } from "react";
+import { useLocation, useNavigate, Link } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+
+export default function VerifyOtp() {
+  const { verifyOtp } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [email, setEmail] = useState(location.state?.email || "");
+  const [otp, setOtp] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      await verifyOtp(email, otp);
+      navigate("/login");
+    } catch (err) {
+      setError(err?.response?.data?.message || "OTP verification failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="max-w-md mx-auto bg-white rounded-2xl shadow-lg p-8 mt-10">
+      <h1 className="text-3xl font-bold text-brand mb-6 text-center">Verify Email</h1>
+      {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-brand" required />
+        <input type="text" placeholder="OTP (6 digits)" value={otp} onChange={(e) => setOtp(e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-brand" required />
+        <button type="submit" disabled={loading} className="w-full py-2 rounded-lg bg-brand text-white font-semibold hover:bg-indigo-700 transition disabled:opacity-60">
+          {loading ? "Verifying..." : "Verify OTP"}
+        </button>
+      </form>
+      <p className="text-center text-sm text-slate-500 mt-4">
+        Back to <Link to="/signup" className="text-brand font-medium">Signup</Link>
+      </p>
+    </div>
+  );
+}
