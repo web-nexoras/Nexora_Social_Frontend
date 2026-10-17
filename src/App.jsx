@@ -9,6 +9,7 @@ import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import VerifyOtp from "./pages/VerifyOtp";
 import Profile from "./pages/Profile";
+import UserProfile from "./pages/UserProfile";
 import Friends from "./pages/Friends";
 import Chat from "./pages/Chat";
 import Dashboard from "./pages/Dashboard";
@@ -40,6 +41,7 @@ export default function App() {
           <Route element={<ProtectedRoute><DashboardShell /></ProtectedRoute>}>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/user/:id" element={<UserProfile />} />
             <Route path="/friends" element={<Friends />} />
             <Route path="/chat" element={<Chat />} />
             <Route path="/groups" element={<Groups />} />

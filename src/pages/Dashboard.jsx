@@ -156,13 +156,13 @@ export default function Dashboard() {
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {suggestions.slice(0, 6).map((u) => (
               <div key={u._id} className="bg-slate-50 rounded-xl p-4 hover:shadow transition">
-                <div className="flex items-center gap-3 mb-3">
+                <Link to={`/user/${u._id}`} className="flex items-center gap-3 mb-3">
                   <img src={u.avatar || "https://via.placeholder.com/40"} alt={u.fullname} className="w-10 h-10 rounded-full object-cover" />
                   <div>
-                    <p className="font-medium text-slate-800 text-sm">{u.fullname}</p>
+                    <p className="font-medium text-slate-800 text-sm hover:text-brand">{u.fullname}</p>
                     <p className="text-xs text-slate-400 truncate">{u.email}</p>
                   </div>
-                </div>
+                </Link>
                 <button onClick={() => sendSuggestionRequest(u._id)} className="w-full py-1.5 rounded-lg bg-brand text-white text-sm font-medium hover:bg-indigo-700 transition">
                   Add Friend
                 </button>

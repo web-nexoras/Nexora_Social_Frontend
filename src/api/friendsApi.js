@@ -1,7 +1,7 @@
 import api from "./axios";
 
 export const friendsApi = {
-  suggestions: () => api.get("/friends/suggestions"),
+  suggestions: (search) => api.get("/friends/suggestions", { params: search ? { search } : {} }),
   sendRequest: (userId) => api.post(`/friends/request/${userId}`),
   incoming: () => api.get("/friends/requests/incoming"),
   sent: () => api.get("/friends/requests/sent"),

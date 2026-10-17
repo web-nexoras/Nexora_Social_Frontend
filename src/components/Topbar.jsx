@@ -1,13 +1,18 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { usersApi } from "../api/usersApi";
 
 export default function Topbar({ onMenuClick }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
+  const [results, setResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [showResults, setShowResults] = useState(false);
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef(null);
+  const searchRef = useRef(null);
 
   const handleLogout = async () => {
     await logout();
@@ -15,22 +20,54 @@ export default function Topbar({ onMenuClick }) {
     navigate("/login");
   };
 
-  const handleSearch = (e) => {
-    e.preventDefault();
-    if (query.trim()) {
-      navigate(`/friends?search=${encodeURIComponent(query.trim())}`);
+  // Live search while typing (debounced)
+  useEffect(() => {
+    const q = query.trim();
+    if (!q) {
+      setResults([]);
+      setShowResults(false);
+      return;
     }
-  };
+    setSearching(true);
+    const t = setTimeout(async () => {
+      try {
+        const res = await usersApi.search(q);
+        setResults(res.data?.users || []);
+        setShowResults(true);
+      } catch (e) {
+        console.error(e);
+        setResults([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [query]);
 
+  // Close dropdowns on outside click
   useEffect(() => {
     const handler = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
-        setOpen(false);
-      }
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setOpen(false);
+      if (searchRef.current && !searchRef.current.contains(e.target)) setShowResults(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
+
+  const goToUser = (id) => {
+    setShowResults(false);
+    setQuery("");
+    navigate(`/user/${id}`);
+  };
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    if (results.length > 0) {
+      goToUser(results[0]._id);
+    } else if (query.trim()) {
+      navigate(`/friends?search=${encodeURIComponent(query.trim())}`);
+    }
+  };
 
   return (
     <div className="flex items-center justify-between gap-4 px-6 py-3 bg-white/80 backdrop-blur shadow-sm">
@@ -44,19 +81,67 @@ export default function Topbar({ onMenuClick }) {
         </svg>
       </button>
 
-      <form onSubmit={handleSearch} className="flex-1 max-w-md relative">
-        <button type="submit" className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 104.5 4.5a7.5 7.5 0 0012.15 12.15z" />
-          </svg>
-        </button>
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search users..."
-          className="w-full pl-10 pr-4 py-2 rounded-full border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand bg-slate-50"
-        />
-      </form>
+      <div ref={searchRef} className="flex-1 max-w-md relative">
+        <form onSubmit={handleSearch}>
+          <button
+            type="submit"
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 z-10"
+            aria-label="Search"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 104.5 4.5a7.5 7.5 0 0012.15 12.15z" />
+            </svg>
+          </button>
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onFocus={() => query.trim() && setShowResults(true)}
+            placeholder="Search users..."
+            className="w-full pl-10 pr-4 py-2 rounded-full border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand bg-slate-50"
+          />
+        </form>
+
+        {showResults && query.trim() && (
+          <div className="absolute left-0 right-0 mt-2 bg-white rounded-xl shadow-lg border py-2 z-50 max-h-80 overflow-y-auto">
+            {searching && results.length === 0 && (
+              <p className="px-4 py-3 text-sm text-slate-400">Searching...</p>
+            )}
+            {!searching && results.length === 0 && (
+              <p className="px-4 py-3 text-sm text-slate-400">No users found</p>
+            )}
+            {results.map((u) => (
+              <button
+                key={u._id}
+                onClick={() => goToUser(u._id)}
+                className="w-full text-left px-4 py-2 flex items-center gap-3 hover:bg-slate-50 transition"
+              >
+                <img
+                  src={u.avatar || "https://via.placeholder.com/40"}
+                  alt=""
+                  className="w-9 h-9 rounded-full object-cover"
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-slate-800 truncate">{u.fullname}</p>
+                  <p className="text-xs text-slate-400 truncate">{u.email}</p>
+                </div>
+                <span
+                  className={`text-[10px] px-2 py-0.5 rounded-full font-semibold shrink-0 ${
+                    u.isFriend
+                      ? "bg-emerald-100 text-emerald-700"
+                      : u.requestSent
+                      ? "bg-amber-100 text-amber-700"
+                      : u.requestReceived
+                      ? "bg-cyan-100 text-cyan-700"
+                      : "bg-slate-100 text-slate-500"
+                  }`}
+                >
+                  {u.isFriend ? "Friend" : u.requestSent ? "Requested" : u.requestReceived ? "Respond" : "Add"}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
       {user && (
         <div className="flex items-center gap-3 shrink-0">

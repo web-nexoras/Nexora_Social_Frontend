@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { friendsApi } from "../api/friendsApi";
 
 const TABS = ["Suggestions", "Incoming", "Sent", "Friends"];
 
 export default function Friends() {
+  const [searchParams] = useSearchParams();
+  const searchQuery = searchParams.get("search") || "";
   const [activeTab, setActiveTab] = useState("Suggestions");
   const [suggestions, setSuggestions] = useState([]);
   const [incoming, setIncoming] = useState([]);
@@ -16,7 +18,7 @@ export default function Friends() {
     setLoading(true);
     try {
       const [s, i, f, se] = await Promise.all([
-        friendsApi.suggestions(),
+        friendsApi.suggestions(searchQuery),
         friendsApi.incoming(),
         friendsApi.list(),
         friendsApi.sent(),
@@ -34,7 +36,13 @@ export default function Friends() {
 
   useEffect(() => {
     loadAll();
-  }, []);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    if (searchQuery) {
+      setActiveTab("Suggestions");
+    }
+  }, [searchQuery]);
 
   const sendRequest = async (userId) => {
     await friendsApi.sendRequest(userId);
@@ -88,18 +96,20 @@ export default function Friends() {
       <main className="md:col-span-3">
         {activeTab === "Suggestions" && (
           <section>
-            <h2 className="text-2xl font-bold text-brand mb-4">Suggestions</h2>
-            {suggestions.length === 0 && <p className="text-slate-500 text-sm">No suggestions</p>}
+            <h2 className="text-2xl font-bold text-brand mb-4">
+              {searchQuery ? `Search results for "${searchQuery}"` : "Suggestions"}
+            </h2>
+            {suggestions.length === 0 && <p className="text-slate-500 text-sm">No users found</p>}
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {suggestions.map((u) => (
                 <div key={u._id} className="bg-white rounded-2xl shadow p-4 hover:shadow-lg transition">
-                  <div className="flex items-center gap-3 mb-3">
+                  <Link to={`/user/${u._id}`} className="flex items-center gap-3 mb-3">
                     <img src={u.avatar || "https://via.placeholder.com/48"} alt={u.fullname} className="w-12 h-12 rounded-full object-cover" />
                     <div>
-                      <p className="font-semibold text-slate-800">{u.fullname}</p>
+                      <p className="font-semibold text-slate-800 hover:text-brand">{u.fullname}</p>
                       <p className="text-xs text-slate-400">{u.email}</p>
                     </div>
-                  </div>
+                  </Link>
                   <button onClick={() => sendRequest(u._id)} className="w-full py-1.5 rounded-lg bg-brand text-white text-sm font-medium hover:bg-indigo-700 transition">
                     Add Friend
                   </button>
