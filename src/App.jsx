@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import Navbar from "./components/Navbar";
 import ProtectedRoute from "./components/ProtectedRoute";
+import Layout from "./components/Layout";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import VerifyOtp from "./pages/VerifyOtp";
@@ -11,6 +12,7 @@ import Friends from "./pages/Friends";
 import Chat from "./pages/Chat";
 import Groups from "./pages/Groups";
 import Home from "./pages/Home";
+import Dashboard from "./pages/Dashboard";
 import PaymentSuccess from "./pages/PaymentSuccess";
 import PaymentFail from "./pages/PaymentFail";
 import PaymentCancel from "./pages/PaymentCancel";
@@ -21,12 +23,22 @@ import PaymentHistory from "./pages/PaymentHistory";
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <div className="min-h-screen bg-gradient-to-br from-slate-50 to-indigo-50">
           <Navbar />
-          <main className="max-w-6xl mx-auto px-4 py-6">
+          <main className="max-w-6xl mx-auto px-4 py-4">
             <Routes>
               <Route path="/" element={<Home />} />
+              <Route
+                path="/dashboard"
+                element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <Dashboard />
+                    </Layout>
+                  </ProtectedRoute>
+                }
+              />
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
               <Route path="/verify-otp" element={<VerifyOtp />} />
@@ -34,7 +46,9 @@ export default function App() {
                 path="/profile"
                 element={
                   <ProtectedRoute>
-                    <Profile />
+                    <Layout>
+                      <Profile />
+                    </Layout>
                   </ProtectedRoute>
                 }
               />
@@ -42,7 +56,9 @@ export default function App() {
                 path="/friends"
                 element={
                   <ProtectedRoute>
-                    <Friends />
+                    <Layout>
+                      <Friends />
+                    </Layout>
                   </ProtectedRoute>
                 }
               />
@@ -50,7 +66,9 @@ export default function App() {
                 path="/chat"
                 element={
                   <ProtectedRoute>
-                    <Chat />
+                    <Layout>
+                      <Chat />
+                    </Layout>
                   </ProtectedRoute>
                 }
               />
@@ -58,7 +76,9 @@ export default function App() {
                 path="/groups"
                 element={
                   <ProtectedRoute>
-                    <Groups />
+                    <Layout>
+                      <Groups />
+                    </Layout>
                   </ProtectedRoute>
                 }
               />
@@ -66,7 +86,9 @@ export default function App() {
                 path="/admin/users"
                 element={
                   <ProtectedRoute>
-                    <AdminUsers />
+                    <Layout>
+                      <AdminUsers />
+                    </Layout>
                   </ProtectedRoute>
                 }
               />
@@ -74,7 +96,9 @@ export default function App() {
                 path="/admin/groups"
                 element={
                   <ProtectedRoute>
-                    <AdminGroups />
+                    <Layout>
+                      <AdminGroups />
+                    </Layout>
                   </ProtectedRoute>
                 }
               />
@@ -85,7 +109,9 @@ export default function App() {
                 path="/payments"
                 element={
                   <ProtectedRoute>
-                    <PaymentHistory />
+                    <Layout>
+                      <PaymentHistory />
+                    </Layout>
                   </ProtectedRoute>
                 }
               />

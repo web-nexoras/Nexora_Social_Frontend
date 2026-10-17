@@ -55,66 +55,104 @@ export default function Friends() {
 
   if (loading) return <p className="text-center mt-10">Loading...</p>;
 
+  const Card = ({ children }) => (
+    <div className="bg-white rounded-2xl shadow p-4 hover:shadow-lg transition">{children}</div>
+  );
+
   return (
-    <div className="grid md:grid-cols-4 gap-6 mt-6">
+    <div className="space-y-8 mt-6">
       {/* Suggestions */}
-      <div className="bg-white rounded-2xl shadow p-5">
-        <h2 className="text-xl font-bold text-brand mb-4">Suggestions</h2>
+      <section>
+        <h2 className="text-2xl font-bold text-brand mb-4">Suggestions</h2>
         {suggestions.length === 0 && <p className="text-slate-500 text-sm">No suggestions</p>}
-        {suggestions.map((u) => (
-          <div key={u._id} className="flex items-center justify-between py-2 border-b last:border-0">
-            <div>
-              <p className="font-medium">{u.fullname}</p>
-              <p className="text-xs text-slate-400">{u.email}</p>
-            </div>
-            <button onClick={() => sendRequest(u._id)} className="text-sm px-3 py-1 rounded bg-brand text-white hover:bg-indigo-700">Add</button>
-          </div>
-        ))}
-      </div>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {suggestions.map((u) => (
+            <Card key={u._id}>
+              <div className="flex items-center gap-3 mb-3">
+                <img src={u.avatar || "https://via.placeholder.com/48"} alt={u.fullname} className="w-12 h-12 rounded-full object-cover" />
+                <div>
+                  <p className="font-semibold text-slate-800">{u.fullname}</p>
+                  <p className="text-xs text-slate-400">{u.email}</p>
+                </div>
+              </div>
+              <button onClick={() => sendRequest(u._id)} className="w-full py-1.5 rounded-lg bg-brand text-white text-sm font-medium hover:bg-indigo-700 transition">
+                Add Friend
+              </button>
+            </Card>
+          ))}
+        </div>
+      </section>
 
-      {/* Incoming Requests */}
-      <div className="bg-white rounded-2xl shadow p-5">
-        <h2 className="text-xl font-bold text-brand mb-4">Incoming</h2>
-        {incoming.length === 0 && <p className="text-slate-500 text-sm">No requests</p>}
-        {incoming.map((r) => (
-          <div key={r._id} className="py-2 border-b last:border-0">
-            <p className="font-medium">{r.sender?.fullname}</p>
-            <p className="text-xs text-slate-400">{r.sender?.email}</p>
-            <div className="flex gap-2 mt-2">
-              <button onClick={() => accept(r._id)} className="text-xs px-3 py-1 rounded bg-green-500 text-white">Accept</button>
-              <button onClick={() => reject(r._id)} className="text-xs px-3 py-1 rounded bg-red-500 text-white">Reject</button>
-            </div>
-          </div>
-        ))}
-      </div>
+      {/* Incoming */}
+      <section>
+        <h2 className="text-2xl font-bold text-brand mb-4">Incoming Requests</h2>
+        {incoming.length === 0 && <p className="text-slate-500 text-sm">No incoming requests</p>}
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {incoming.map((r) => (
+            <Card key={r._id}>
+              <div className="flex items-center gap-3 mb-3">
+                <img src={r.sender?.avatar || "https://via.placeholder.com/48"} alt={r.sender?.fullname} className="w-12 h-12 rounded-full object-cover" />
+                <div>
+                  <p className="font-semibold text-slate-800">{r.sender?.fullname}</p>
+                  <p className="text-xs text-slate-400">{r.sender?.email}</p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => accept(r._id)} className="flex-1 py-1.5 rounded-lg bg-green-500 text-white text-sm font-medium hover:bg-green-600 transition">
+                  Accept
+                </button>
+                <button onClick={() => reject(r._id)} className="flex-1 py-1.5 rounded-lg bg-red-500 text-white text-sm font-medium hover:bg-red-600 transition">
+                  Reject
+                </button>
+              </div>
+            </Card>
+          ))}
+        </div>
+      </section>
 
-      {/* Sent Requests */}
-      <div className="bg-white rounded-2xl shadow p-5">
-        <h2 className="text-xl font-bold text-brand mb-4">Sent</h2>
+      {/* Sent */}
+      <section>
+        <h2 className="text-2xl font-bold text-brand mb-4">Sent Requests</h2>
         {sent.length === 0 && <p className="text-slate-500 text-sm">No sent requests</p>}
-        {sent.map((r) => (
-          <div key={r._id} className="py-2 border-b last:border-0">
-            <p className="font-medium">{r.receiver?.fullname}</p>
-            <p className="text-xs text-slate-400">{r.receiver?.email}</p>
-            <button onClick={() => cancel(r._id)} className="mt-2 text-xs px-3 py-1 rounded bg-slate-500 text-white">Cancel</button>
-          </div>
-        ))}
-      </div>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {sent.map((r) => (
+            <Card key={r._id}>
+              <div className="flex items-center gap-3 mb-3">
+                <img src={r.receiver?.avatar || "https://via.placeholder.com/48"} alt={r.receiver?.fullname} className="w-12 h-12 rounded-full object-cover" />
+                <div>
+                  <p className="font-semibold text-slate-800">{r.receiver?.fullname}</p>
+                  <p className="text-xs text-slate-400">{r.receiver?.email}</p>
+                </div>
+              </div>
+              <button onClick={() => cancel(r._id)} className="w-full py-1.5 rounded-lg bg-slate-500 text-white text-sm font-medium hover:bg-slate-600 transition">
+                Cancel
+              </button>
+            </Card>
+          ))}
+        </div>
+      </section>
 
       {/* Friends */}
-      <div className="bg-white rounded-2xl shadow p-5">
-        <h2 className="text-xl font-bold text-brand mb-4">Friends</h2>
+      <section>
+        <h2 className="text-2xl font-bold text-brand mb-4">Friends</h2>
         {friends.length === 0 && <p className="text-slate-500 text-sm">No friends yet</p>}
-        {friends.map((f) => (
-          <div key={f.friendshipId} className="flex items-center justify-between py-2 border-b last:border-0">
-            <div>
-              <p className="font-medium">{f.friend?.fullname}</p>
-              <p className="text-xs text-slate-400">{f.friend?.email}</p>
-            </div>
-            <Link to={`/chat?user=${f.friend?._id}`} className="text-xs px-3 py-1 rounded bg-accent text-white">Chat</Link>
-          </div>
-        ))}
-      </div>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {friends.map((f) => (
+            <Card key={f.friendshipId}>
+              <div className="flex items-center gap-3 mb-3">
+                <img src={f.friend?.avatar || "https://via.placeholder.com/48"} alt={f.friend?.fullname} className="w-12 h-12 rounded-full object-cover" />
+                <div>
+                  <p className="font-semibold text-slate-800">{f.friend?.fullname}</p>
+                  <p className="text-xs text-slate-400">{f.friend?.email}</p>
+                </div>
+              </div>
+              <Link to={`/chat?user=${f.friend?._id}`} className="block text-center w-full py-1.5 rounded-lg bg-accent text-white text-sm font-medium hover:bg-cyan-600 transition">
+                Chat
+              </Link>
+            </Card>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }

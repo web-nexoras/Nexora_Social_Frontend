@@ -1,35 +1,82 @@
-import React from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 export default function Navbar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const dropdownRef = useRef(null);
 
   const handleLogout = async () => {
     await logout();
+    setOpen(false);
     navigate("/login");
   };
 
+  const handleSearch = (e) => {
+    e.preventDefault();
+    if (query.trim()) {
+      navigate(`/friends?search=${encodeURIComponent(query.trim())}`);
+    }
+  };
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
   return (
     <nav className="bg-white/80 backdrop-blur shadow-sm sticky top-0 z-50">
-      <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-        <Link to="/" className="text-2xl font-bold text-brand">Nexora Social</Link>
-        <div className="flex items-center gap-4">
+      <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
+        <Link to="/" className="text-2xl font-bold text-brand shrink-0">Nexora Social</Link>
+
+        {user && (
+          <form onSubmit={handleSearch} className="flex-1 max-w-md relative">
+            <button type="submit" className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 104.5 4.5a7.5 7.5 0 0012.15 12.15z" />
+              </svg>
+            </button>
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search users..."
+              className="w-full pl-10 pr-4 py-2 rounded-full border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand bg-slate-50"
+            />
+          </form>
+        )}
+
+        <div className="flex items-center gap-4 shrink-0">
           {user ? (
             <>
-              <Link to="/profile" className="text-slate-700 hover:text-brand">Profile</Link>
-              <Link to="/friends" className="text-slate-700 hover:text-brand">Friends</Link>
-              <Link to="/chat" className="text-slate-700 hover:text-brand">Chat</Link>
-              <Link to="/groups" className="text-slate-700 hover:text-brand">Groups</Link>
-              <Link to="/payments" className="text-slate-700 hover:text-brand">Payments</Link>
-              {user?.role === "admin" && (
-                <>
-                  <Link to="/admin/users" className="text-slate-700 hover:text-brand">Admin Users</Link>
-                  <Link to="/admin/groups" className="text-slate-700 hover:text-brand">Admin Groups</Link>
-                </>
-              )}
-              <button onClick={handleLogout} className="px-4 py-1.5 rounded-lg bg-brand text-white hover:bg-indigo-700 transition">Logout</button>
+              <div className="hidden sm:flex flex-col text-right">
+                <span className="text-sm font-semibold text-slate-800">{user.fullname}</span>
+                <span className="text-xs text-slate-400">{user.email}</span>
+              </div>
+              <div className="relative" ref={dropdownRef}>
+                <button onClick={() => setOpen(!open)} className="flex items-center gap-2">
+                  <img
+                    src={user.avatar || "https://via.placeholder.com/40"}
+                    alt="avatar"
+                    className="w-9 h-9 rounded-full object-cover border-2 border-brand"
+                  />
+                </button>
+                {open && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border py-2 z-50">
+                    <Link to="/dashboard" onClick={() => setOpen(false)} className="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">Dashboard</Link>
+                    <Link to="/profile" onClick={() => setOpen(false)} className="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">Profile</Link>
+                    <button onClick={handleLogout} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">Logout</button>
+                  </div>
+                )}
+              </div>
             </>
           ) : (
             <>
