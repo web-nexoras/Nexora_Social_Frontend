@@ -21,6 +21,14 @@ export default function Navbar() {
               <Link to="/profile" className="text-slate-700 hover:text-brand">Profile</Link>
               <Link to="/friends" className="text-slate-700 hover:text-brand">Friends</Link>
               <Link to="/chat" className="text-slate-700 hover:text-brand">Chat</Link>
+              <Link to="/groups" className="text-slate-700 hover:text-brand">Groups</Link>
+              <Link to="/payments" className="text-slate-700 hover:text-brand">Payments</Link>
+              {user?.role === "admin" && (
+                <>
+                  <Link to="/admin/users" className="text-slate-700 hover:text-brand">Admin Users</Link>
+                  <Link to="/admin/groups" className="text-slate-700 hover:text-brand">Admin Groups</Link>
+                </>
+              )}
               <button onClick={handleLogout} className="px-4 py-1.5 rounded-lg bg-brand text-white hover:bg-indigo-700 transition">Logout</button>
             </>
           ) : (

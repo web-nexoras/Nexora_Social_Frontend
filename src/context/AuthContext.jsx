@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
-import api from "../api/axios";
+import { authApi } from "../api/authApi";
 
 const AuthContext = createContext(null);
 
@@ -11,7 +11,7 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const loadUser = async () => {
       try {
-        const res = await api.get("/auth/me");
+        const res = await authApi.getProfile();
         setUser(res.data?.user || res.data);
       } catch (error) {
         setUser(null);
@@ -23,32 +23,29 @@ export function AuthProvider({ children }) {
   }, []);
 
   const login = async (email, password) => {
-    const res = await api.post("/auth/signin", { email, password });
-    // refresh user
-    const me = await api.get("/auth/me");
+    const res = await authApi.signin(email, password);
+    const me = await authApi.getProfile();
     setUser(me.data?.user || me.data);
     return res.data;
   };
 
   const signup = async (fullname, email, password) => {
-    const res = await api.post("/auth/signup", { fullname, email, password });
+    const res = await authApi.signup(fullname, email, password);
     return res.data;
   };
 
   const verifyOtp = async (email, otp) => {
-    const res = await api.post("/auth/verify-otp", { email, otp });
+    const res = await authApi.verifyOtp(email, otp);
     return res.data;
   };
 
   const logout = async () => {
-    await api.post("/auth/signout");
+    await authApi.signout();
     setUser(null);
   };
 
   const updateProfile = async (formData) => {
-    const res = await api.put("/auth/me", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+    const res = await authApi.updateProfile(formData);
     setUser(res.data?.user || res.data);
     return res.data;
   };

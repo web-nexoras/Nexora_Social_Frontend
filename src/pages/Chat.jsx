@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
-import api from "../api/axios";
+import { chatApi } from "../api/chatApi";
 import { io } from "socket.io-client";
 
 const SOCKET_URL = import.meta.env.VITE_API_URL?.replace("/api/v1", "") || "http://localhost:5000";
@@ -8,6 +8,7 @@ const SOCKET_URL = import.meta.env.VITE_API_URL?.replace("/api/v1", "") || "http
 export default function Chat() {
   const [searchParams] = useSearchParams();
   const targetUserId = searchParams.get("user");
+  const convParam = searchParams.get("conversation");
 
   const [conversations, setConversations] = useState([]);
   const [activeId, setActiveId] = useState(null);
@@ -19,7 +20,7 @@ export default function Chat() {
 
   // Load conversations
   const loadConversations = async () => {
-    const res = await api.get("/chat/conversations");
+    const res = await chatApi.conversations();
     setConversations(res.data.conversations || []);
   };
 
@@ -27,12 +28,18 @@ export default function Chat() {
     loadConversations();
   }, []);
 
+  // Load conversation from query param
+  useEffect(() => {
+    if (!convParam) return;
+    setActiveId(convParam);
+  }, [convParam]);
+
   // Create/get direct conversation if targetUserId provided
   useEffect(() => {
     if (!targetUserId) return;
     const init = async () => {
       try {
-        const res = await api.post(`/chat/conversations/direct/${targetUserId}`);
+        const res = await chatApi.createDirect(targetUserId);
         const conv = res.data.conversation;
         setActiveId(conv._id);
         setConversations((prev) => {
@@ -53,7 +60,7 @@ export default function Chat() {
     const load = async () => {
       setLoading(true);
       try {
-        const res = await api.get(`/chat/conversations/${activeId}/messages`);
+        const res = await chatApi.messages(activeId);
         setMessages(res.data.messages || []);
       } catch (e) {
         console.error(e);
@@ -92,7 +99,7 @@ export default function Chat() {
     e.preventDefault();
     if (!text.trim() || !activeId) return;
     try {
-      await api.post(`/chat/conversations/${activeId}/messages`, { text });
+      await chatApi.send(activeId, text);
       setText("");
     } catch (e) {
       console.error(e);

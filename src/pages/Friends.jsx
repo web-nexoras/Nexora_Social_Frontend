@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import api from "../api/axios";
+import { friendsApi } from "../api/friendsApi";
 
 export default function Friends() {
   const [suggestions, setSuggestions] = useState([]);
@@ -13,10 +13,10 @@ export default function Friends() {
     setLoading(true);
     try {
       const [s, i, f, se] = await Promise.all([
-        api.get("/friends/suggestions"),
-        api.get("/friends/requests/incoming"),
-        api.get("/friends"),
-        api.get("/friends/requests/sent"),
+        friendsApi.suggestions(),
+        friendsApi.incoming(),
+        friendsApi.list(),
+        friendsApi.sent(),
       ]);
       setSuggestions(s.data?.users || []);
       setIncoming(i.data?.requests || []);
@@ -34,22 +34,22 @@ export default function Friends() {
   }, []);
 
   const sendRequest = async (userId) => {
-    await api.post(`/friends/request/${userId}`);
+    await friendsApi.sendRequest(userId);
     loadAll();
   };
 
   const accept = async (id) => {
-    await api.patch(`/friends/requests/${id}/accept`);
+    await friendsApi.accept(id);
     loadAll();
   };
 
   const reject = async (id) => {
-    await api.patch(`/friends/requests/${id}/reject`);
+    await friendsApi.reject(id);
     loadAll();
   };
 
   const cancel = async (id) => {
-    await api.patch(`/friends/requests/${id}/cancel`);
+    await friendsApi.cancel(id);
     loadAll();
   };
 

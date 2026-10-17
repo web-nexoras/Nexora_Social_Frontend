@@ -9,7 +9,14 @@ import VerifyOtp from "./pages/VerifyOtp";
 import Profile from "./pages/Profile";
 import Friends from "./pages/Friends";
 import Chat from "./pages/Chat";
+import Groups from "./pages/Groups";
 import Home from "./pages/Home";
+import PaymentSuccess from "./pages/PaymentSuccess";
+import PaymentFail from "./pages/PaymentFail";
+import PaymentCancel from "./pages/PaymentCancel";
+import AdminGroups from "./pages/AdminGroups";
+import AdminUsers from "./pages/AdminUsers";
+import PaymentHistory from "./pages/PaymentHistory";
 
 export default function App() {
   return (
@@ -44,6 +51,41 @@ export default function App() {
                 element={
                   <ProtectedRoute>
                     <Chat />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/groups"
+                element={
+                  <ProtectedRoute>
+                    <Groups />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/users"
+                element={
+                  <ProtectedRoute>
+                    <AdminUsers />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/groups"
+                element={
+                  <ProtectedRoute>
+                    <AdminGroups />
+                  </ProtectedRoute>
+                }
+              />
+              <Route path="/payment/success" element={<PaymentSuccess />} />
+              <Route path="/payment/fail" element={<PaymentFail />} />
+              <Route path="/payment/cancel" element={<PaymentCancel />} />
+              <Route
+                path="/payments"
+                element={
+                  <ProtectedRoute>
+                    <PaymentHistory />
                   </ProtectedRoute>
                 }
               />
