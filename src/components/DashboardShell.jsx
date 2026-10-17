@@ -19,7 +19,7 @@ export default function DashboardShell() {
 
       {/* Sidebar */}
       <div
-        className={`fixed md:static inset-y-0 left-0 z-50 w-64 transform transition-transform duration-200 md:translate-x-0 ${
+        className={`fixed md:static inset-y-0 left-0 z-50 w-64 transform transition-transform duration-200 md:translate-x-0 flex flex-col ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >

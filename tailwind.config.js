@@ -7,8 +7,8 @@ export default {
       },
       colors: {
         // Monochrome theme — black & white (no blue)
-        brand: "#0f172a",
-        accent: "#334155",
+        brand: "#1e293b",
+        accent: "#475569",
         // Remap blue/cyan scales to greyscale so the whole app turns monochrome
         indigo: {
           50: "#f8fafc",

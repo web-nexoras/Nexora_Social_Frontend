@@ -15,6 +15,7 @@ body {
   --neo-bg: #e8ebf0;
   --neo-dark: #c5c9d2;
   --neo-light: #ffffff;
+  --neo-border: #cdd4de;
 }
 
 .neo-surface {
@@ -24,21 +25,25 @@ body {
 .neo-raised {
   background: var(--neo-bg);
   box-shadow: 8px 8px 16px var(--neo-dark), -8px -8px 16px var(--neo-light);
+  border: 1px solid var(--neo-border);
 }
 
 .neo-raised-sm {
   background: var(--neo-bg);
   box-shadow: 4px 4px 8px var(--neo-dark), -4px -4px 8px var(--neo-light);
+  border: 1px solid var(--neo-border);
 }
 
 .neo-inset {
   background: var(--neo-bg);
   box-shadow: inset 4px 4px 8px var(--neo-dark), inset -4px -4px 8px var(--neo-light);
+  border: 1px solid var(--neo-border);
 }
 
 .neo-btn {
   background: var(--neo-bg);
   box-shadow: 6px 6px 12px var(--neo-dark), -6px -6px 12px var(--neo-light);
+  border: 1px solid var(--neo-border);
   transition: box-shadow 0.15s ease, transform 0.15s ease;
 }
 
@@ -54,6 +59,7 @@ body {
 .neo-input {
   background: var(--neo-bg);
   box-shadow: inset 4px 4px 8px var(--neo-dark), inset -4px -4px 8px var(--neo-light);
+  border: 1px solid var(--neo-border);
 }
 
 .neo-input::placeholder {
@@ -63,20 +69,22 @@ body {
 .neo-input:focus {
   outline: none;
   box-shadow: inset 4px 4px 8px var(--neo-dark), inset -4px -4px 8px var(--neo-light),
-    0 0 0 2px rgba(15, 23, 42, 0.35);
+    0 0 0 2px rgba(30, 41, 59, 0.35);
 }
 
 /* ---------- App-wide card / surface overrides ---------- */
-/* White rounded cards become neomorphic raised panels */
+/* White rounded cards become neomorphic raised panels with grey borders */
 .bg-white.rounded-xl,
 .bg-white.rounded-2xl,
 .bg-white.rounded-3xl {
   background: var(--neo-bg);
   box-shadow: 8px 8px 16px var(--neo-dark), -8px -8px 16px var(--neo-light);
+  border: 1px solid var(--neo-border);
 }
 
-/* Light grey blocks become neomorphic inset panels */
+/* Light grey blocks become neomorphic inset panels with grey borders */
 .bg-slate-50 {
   background: var(--neo-bg);
   box-shadow: inset 3px 3px 6px var(--neo-dark), inset -3px -3px 6px var(--neo-light);
+  border: 1px solid var(--neo-border);
 }

@@ -13,7 +13,7 @@ export default function Sidebar({ onNavigate }) {
   const { user } = useAuth();
 
   return (
-    <aside className="neo-raised p-4 min-h-screen overflow-y-auto" onClick={onNavigate}>
+    <aside className="neo-raised p-4 flex-1 min-h-screen overflow-y-auto" onClick={onNavigate}>
       <div className="mb-6">
         <h2 className="text-lg font-bold text-brand">{user?.role === "admin" ? "Nexora Social Admin" : "Nexora Social"}</h2>
         <p className="text-xs text-slate-400 mt-1">

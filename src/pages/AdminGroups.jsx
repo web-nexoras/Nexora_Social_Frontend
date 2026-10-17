@@ -7,9 +7,11 @@ export default function AdminGroups() {
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [members, setMembers] = useState([]);
   const [subscribers, setSubscribers] = useState([]);
-  const [form, setForm] = useState({ name: "", description: "", price: "", currency: "BDT" });
+  const [form, setForm] = useState({ name: "", description: "", price: "", currency: "BDT", image: "" });
   const [userIds, setUserIds] = useState("");
   const [msg, setMsg] = useState("");
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({ name: "", description: "", price: "", currency: "BDT", image: "" });
 
   const load = async () => {
     try {
@@ -33,8 +35,9 @@ export default function AdminGroups() {
         description: form.description,
         price: Number(form.price),
         currency: form.currency,
+        image: form.image || undefined,
       });
-      setForm({ name: "", description: "", price: "", currency: "BDT" });
+      setForm({ name: "", description: "", price: "", currency: "BDT", image: "" });
       load();
       setMsg("Group created");
     } catch (e) {
@@ -82,6 +85,50 @@ export default function AdminGroups() {
     }
   };
 
+  const startEdit = (g) => {
+    setEditingId(g._id);
+    setEditForm({
+      name: g.name || "",
+      description: g.description || "",
+      price: g.price ?? "",
+      currency: g.currency || "BDT",
+      image: g.image || "",
+    });
+  };
+
+  const cancelEdit = () => setEditingId(null);
+
+  const saveEdit = async (groupId) => {
+    setMsg("");
+    try {
+      await groupsApi.update(groupId, {
+        name: editForm.name,
+        description: editForm.description,
+        price: Number(editForm.price),
+        currency: editForm.currency,
+        image: editForm.image || undefined,
+      });
+      setEditingId(null);
+      load();
+      setMsg("Group updated");
+    } catch (e) {
+      setMsg(e?.response?.data?.message || "Failed to update group");
+    }
+  };
+
+  const deleteGroup = async (groupId) => {
+    if (!window.confirm("Delete this group? This cannot be undone.")) return;
+    setMsg("");
+    try {
+      await groupsApi.remove(groupId);
+      if (selectedGroup === groupId) setSelectedGroup(null);
+      load();
+      setMsg("Group deleted");
+    } catch (e) {
+      setMsg(e?.response?.data?.message || "Failed to delete group");
+    }
+  };
+
   return (
     <div className="mt-6">
       <h1 className="text-3xl font-bold text-brand mb-6">Admin Groups</h1>
@@ -93,7 +140,8 @@ export default function AdminGroups() {
           <input placeholder="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="px-4 py-2 border rounded-lg" required />
           <input placeholder="Price" type="number" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} className="px-4 py-2 border rounded-lg" required />
           <input placeholder="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="px-4 py-2 border rounded-lg md:col-span-2" />
-          <button type="submit" className="px-6 py-2 rounded-lg bg-brand text-white font-semibold hover:bg-indigo-700 transition">Create</button>
+          <input placeholder="Image URL (optional)" value={form.image || ""} onChange={(e) => setForm({ ...form, image: e.target.value })} className="px-4 py-2 border rounded-lg md:col-span-2" />
+          <button type="submit" className="px-6 py-2 rounded-lg bg-brand text-white font-semibold hover:bg-slate-700 transition">Create</button>
         </form>
       </div>
 
@@ -106,16 +154,73 @@ export default function AdminGroups() {
                 <p className="text-sm text-slate-500">{g.description}</p>
                 <p className="text-sm mt-1">Price: {g.price} {g.currency}</p>
               </div>
-              <button
-                onClick={() => {
-                  setSelectedGroup(g._id);
-                  refreshGroup(g._id);
-                }}
-                className="text-xs px-3 py-1 rounded bg-slate-200 hover:bg-slate-300"
-              >
-                Manage
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => startEdit(g)}
+                  className="text-xs px-3 py-1 rounded bg-brand text-white hover:bg-slate-700"
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={() => deleteGroup(g._id)}
+                  className="text-xs px-3 py-1 rounded bg-slate-700 text-white hover:bg-slate-800"
+                >
+                  Delete
+                </button>
+                <button
+                  onClick={() => {
+                    setSelectedGroup(g._id);
+                    refreshGroup(g._id);
+                  }}
+                  className="text-xs px-3 py-1 rounded bg-slate-200 hover:bg-slate-300"
+                >
+                  Manage
+                </button>
+              </div>
             </div>
+
+            {editingId === g._id && (
+              <div className="mt-4 border-t pt-4">
+                <h4 className="font-semibold mb-2">Edit Group</h4>
+                <div className="grid md:grid-cols-2 gap-2">
+                  <input
+                    placeholder="Name"
+                    value={editForm.name}
+                    onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                    className="px-3 py-2 border rounded-lg"
+                    required
+                  />
+                  <input
+                    placeholder="Price"
+                    type="number"
+                    value={editForm.price}
+                    onChange={(e) => setEditForm({ ...editForm, price: e.target.value })}
+                    className="px-3 py-2 border rounded-lg"
+                    required
+                  />
+                  <input
+                    placeholder="Description"
+                    value={editForm.description}
+                    onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                    className="px-3 py-2 border rounded-lg md:col-span-2"
+                  />
+                  <input
+                    placeholder="Image URL (optional)"
+                    value={editForm.image}
+                    onChange={(e) => setEditForm({ ...editForm, image: e.target.value })}
+                    className="px-3 py-2 border rounded-lg md:col-span-2"
+                  />
+                </div>
+                <div className="flex gap-2 mt-3">
+                  <button onClick={() => saveEdit(g._id)} className="px-4 py-2 rounded-lg bg-brand text-white font-semibold hover:bg-slate-700 transition">
+                    Save
+                  </button>
+                  <button onClick={cancelEdit} className="px-4 py-2 rounded-lg bg-slate-200 text-slate-700 hover:bg-slate-300 transition">
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
 
             {selectedGroup === g._id && (
               <div className="mt-4 border-t pt-4">
