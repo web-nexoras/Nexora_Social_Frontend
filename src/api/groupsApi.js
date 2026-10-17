@@ -14,5 +14,6 @@ export const groupsApi = {
 
 export const paymentsApi = {
   initSubscription: (groupId) => api.post("/payments/subscription/init", { groupId }),
+  demoConfirm: (transactionId, method) => api.post("/payments/subscription/demo-confirm", { transactionId, method }),
   mySubscriptions: () => api.get("/payments/my-subscriptions"),
 };

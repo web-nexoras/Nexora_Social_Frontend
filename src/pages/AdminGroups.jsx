@@ -77,7 +77,8 @@ export default function AdminGroups() {
     }
     try {
       const res = await groupsApi.addMembers(groupId, ids);
-      setMsg(res.data?.message || "Members processed");
+      const added = res.data?.addedCount ?? 0;
+      setMsg(added > 0 ? `${added} member${added > 1 ? "s" : ""} added to the group` : res.data?.message || "Members processed");
       setUserIds("");
       refreshGroup(groupId);
     } catch (e) {

@@ -1,12 +1,11 @@
 import React, { useState } from "react";
-import { useLocation, useNavigate, Link } from "react-router-dom";
+import { useLocation, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { authApi } from "../api/authApi";
 import AuthShell from "../components/AuthShell";
 
 export default function VerifyOtp() {
   const { verifyOtp } = useAuth();
-  const navigate = useNavigate();
   const location = useLocation();
   const [email, setEmail] = useState(location.state?.email || "");
   const [otp, setOtp] = useState("");
@@ -21,7 +20,7 @@ export default function VerifyOtp() {
     setLoading(true);
     try {
       await verifyOtp(email, otp);
-      navigate("/login");
+      setMsg("Email verified! Your account is now pending admin approval. You can log in once the admin approves you.");
     } catch (err) {
       setError(err?.response?.data?.message || "OTP verification failed");
     } finally {
@@ -45,9 +44,15 @@ export default function VerifyOtp() {
       title="Verify Email"
       subtitle="Enter the 6-digit code we sent to your email to activate your account."
       footer={
-        <Link to="/signup" className="text-brand font-semibold hover:underline">
-          ← Back to Sign up
-        </Link>
+        msg ? (
+          <Link to="/login" className="text-brand font-semibold hover:underline">
+            Go to Sign In →
+          </Link>
+        ) : (
+          <Link to="/signup" className="text-brand font-semibold hover:underline">
+            ← Back to Sign Up
+          </Link>
+        )
       }
     >
       {msg && <p className="text-emerald-600 text-sm mb-4 text-center bg-emerald-50 rounded-xl py-2 px-3">{msg}</p>}

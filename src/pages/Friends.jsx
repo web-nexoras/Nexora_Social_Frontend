@@ -177,16 +177,21 @@ export default function Friends() {
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {friends.map((f) => (
                 <div key={f.friendshipId} className="bg-white rounded-2xl shadow p-4 hover:shadow-lg transition">
-                  <div className="flex items-center gap-3 mb-3">
+                  <Link to={`/user/${f.friend?._id}`} className="flex items-center gap-3 mb-3">
                     <img src={f.friend?.avatar || "https://via.placeholder.com/48"} alt={f.friend?.fullname} className="w-12 h-12 rounded-full object-cover" />
                     <div>
-                      <p className="font-semibold text-slate-800">{f.friend?.fullname}</p>
+                      <p className="font-semibold text-slate-800 hover:text-brand">{f.friend?.fullname}</p>
                       <p className="text-xs text-slate-400">{f.friend?.email}</p>
                     </div>
-                  </div>
-                  <Link to={`/chat?user=${f.friend?._id}`} className="block text-center w-full py-1.5 rounded-lg bg-accent text-white text-sm font-medium hover:bg-cyan-600 transition">
-                    Chat
                   </Link>
+                  <div className="flex gap-2">
+                    <Link to={`/user/${f.friend?._id}`} className="flex-1 text-center py-1.5 rounded-lg bg-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-300 transition">
+                      Profile
+                    </Link>
+                    <Link to={`/chat?user=${f.friend?._id}`} className="flex-1 text-center py-1.5 rounded-lg bg-accent text-white text-sm font-medium hover:bg-slate-700 transition">
+                      Chat
+                    </Link>
+                  </div>
                 </div>
               ))}
             </div>

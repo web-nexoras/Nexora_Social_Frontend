@@ -34,7 +34,7 @@ export default function Login() {
         <>
           Don&apos;t have an account?{" "}
           <Link to="/signup" className="text-brand font-semibold hover:underline">
-            Create account
+            Sign Up
           </Link>
         </>
       }

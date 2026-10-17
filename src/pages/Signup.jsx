@@ -29,13 +29,13 @@ export default function Signup() {
 
   return (
     <AuthShell
-      title="Create Account"
+      title="Sign Up"
       subtitle="Join Nexora Social to connect with friends, chat in realtime, and unlock premium groups."
       footer={
         <>
           Already have an account?{" "}
           <Link to="/login" className="text-brand font-semibold hover:underline">
-            Sign in
+            Sign In
           </Link>
         </>
       }
@@ -78,7 +78,7 @@ export default function Signup() {
           disabled={loading}
           className="w-full py-3 rounded-xl bg-gradient-to-r from-brand to-indigo-600 text-white text-sm font-semibold neo-btn disabled:opacity-60"
         >
-          {loading ? "Creating..." : "Create Account"}
+          {loading ? "Signing up..." : "Sign Up"}
         </button>
       </form>
     </AuthShell>

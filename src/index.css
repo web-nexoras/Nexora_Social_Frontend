@@ -6,7 +6,7 @@
 
 body {
   font-family: "Inter", system-ui, "Segoe UI", sans-serif;
-  background: #e8ebf0;
+  background: var(--neo-bg);
   color: #1f2937;
 }
 
@@ -16,6 +16,14 @@ body {
   --neo-dark: #c5c9d2;
   --neo-light: #ffffff;
   --neo-border: #cdd4de;
+}
+
+/* Dark neomorphism — darker surface with softer light/dark shadows */
+.dark {
+  --neo-bg: #20242b;
+  --neo-dark: #171a1f;
+  --neo-light: #2b313a;
+  --neo-border: #343a43;
 }
 
 .neo-surface {
@@ -82,9 +90,59 @@ body {
   border: 1px solid var(--neo-border);
 }
 
+/* Modals float over a dark scrim — use a clean soft drop shadow, not the heavy panel shadow */
+.bg-white.rounded-2xl.neo-modal {
+  background: var(--neo-bg);
+  border: 1px solid var(--neo-border);
+  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.28), 0 10px 20px rgba(15, 23, 42, 0.14);
+}
+
+/* Floating dropdown menus — clean soft drop shadow, not the heavy offset panel shadow */
+.bg-white.rounded-xl.neo-menu,
+.neo-menu {
+  background: var(--neo-bg);
+  border: 1px solid var(--neo-border);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12), 0 4px 8px rgba(15, 23, 42, 0.06);
+}
+.dark .neo-menu {
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.5), 0 4px 10px rgba(0, 0, 0, 0.28);
+}
+
 /* Light grey blocks become neomorphic inset panels with grey borders */
 .bg-slate-50 {
   background: var(--neo-bg);
   box-shadow: inset 3px 3px 6px var(--neo-dark), inset -3px -3px 6px var(--neo-light);
   border: 1px solid var(--neo-border);
 }
+
+/* ---------- Dark mode readability overrides ---------- */
+/* Text colors */
+.dark body { color: #e5e7eb; }
+.dark .text-slate-800,
+.dark .text-slate-900 { color: #e5e7eb; }
+.dark .text-slate-700 { color: #cbd5e1; }
+.dark .text-slate-600 { color: #9ca3af; }
+.dark .text-slate-500 { color: #9ca3af; }
+.dark .text-slate-400 { color: #6b7280; }
+
+/* Surfaces & blocks */
+.dark .bg-white { background-color: var(--neo-bg); }
+.dark .bg-slate-50 { background-color: #262b33; }
+.dark .bg-slate-100 { background-color: #262b33; }
+.dark .bg-slate-200 { background-color: #2e343d; }
+.dark .bg-slate-300 { background-color: #3a414b; }
+
+/* Borders */
+.dark .border,
+.dark .border-slate-200,
+.dark .border-slate-100 { border-color: var(--neo-border); }
+
+/* Hover states */
+.dark .hover\:bg-slate-50:hover { background-color: #262b33; }
+.dark .hover\:bg-slate-100:hover { background-color: #262b33; }
+.dark .hover\:bg-slate-200:hover { background-color: #2e343d; }
+.dark .hover\:bg-slate-300:hover { background-color: #3a414b; }
+
+/* Active nav pills keep contrast */
+.dark .bg-brand { background-color: #3b4657; }
+.dark .text-brand { color: #cbd5e1; }

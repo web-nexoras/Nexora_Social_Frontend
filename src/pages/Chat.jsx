@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import { chatApi } from "../api/chatApi";
 import { groupsApi, paymentsApi } from "../api/groupsApi";
 import { usersApi } from "../api/usersApi";
+import PaymentMethodModal from "../components/PaymentMethodModal";
 import { io } from "socket.io-client";
 
 const SOCKET_URL = import.meta.env.VITE_API_URL?.replace("/api/v1", "") || "http://localhost:5000";
@@ -34,6 +35,13 @@ export default function Chat() {
   const [memberResults, setMemberResults] = useState([]);
   const [memberMsg, setMemberMsg] = useState("");
   const [adding, setAdding] = useState(false);
+  const [groupMembers, setGroupMembers] = useState([]);
+  const [showPay, setShowPay] = useState(false);
+  const [payTxn, setPayTxn] = useState(null);
+  const [payMethod, setPayMethod] = useState("bkash");
+  const [paying, setPaying] = useState(false);
+  const [payMsg, setPayMsg] = useState("");
+  const [payDone, setPayDone] = useState(false);
   const socketRef = useRef(null);
   const bottomRef = useRef(null);
 
@@ -116,6 +124,7 @@ export default function Chat() {
     setMemberQuery("");
     setMemberResults([]);
     setMemberMsg("");
+    setGroupMembers([]);
     (async () => {
       try {
         const res = await groupsApi.byConversation(activeId);
@@ -146,6 +155,11 @@ export default function Chat() {
   useEffect(() => {
     if (activeId) setMobileView("chat");
   }, [activeId]);
+
+  // Keep the group member list in sync while the add-member panel is open
+  useEffect(() => {
+    if (showAddMember && activeGroup) loadMembers(activeGroup._id);
+  }, [showAddMember, activeGroup]);
 
   useEffect(() => {
     if (!activeId) return;
@@ -232,16 +246,49 @@ export default function Chat() {
     setSubscribing(true);
     setSubscribeMsg("");
     try {
+      // Create the pending subscription, then open our own method picker
+      // instead of redirecting to the SSLCommerz hosted page.
       const res = await paymentsApi.initSubscription(lockedGroup._id);
-      if (res.data?.gatewayPageURL) {
-        window.location.href = res.data.gatewayPageURL;
-      } else {
-        setSubscribeMsg(res.data?.message || "Failed to start payment");
-      }
+      setPayTxn(res.data?.transactionId || null);
+      setPayMethod("bkash");
+      setPayMsg("");
+      setPayDone(false);
+      setShowSubscribe(false);
+      setShowPay(true);
     } catch (e) {
       setSubscribeMsg(e?.response?.data?.message || "Subscription failed");
     } finally {
       setSubscribing(false);
+    }
+  };
+
+  const confirmPayment = async () => {
+    if (!payTxn) {
+      setPayMsg("No payment session found. Close and try again.");
+      return;
+    }
+    setPaying(true);
+    setPayMsg("");
+    try {
+      const res = await paymentsApi.demoConfirm(payTxn, payMethod);
+      setPayMsg(res.data?.message || "Payment successful");
+      setPayDone(true);
+      // Now a member — refresh the conversation so the group unlocks
+      setShowSubscribe(false);
+      setLockedGroup(null);
+      await loadConversations();
+      if (activeId) {
+        try {
+          const mres = await chatApi.messages(activeId);
+          setMessages(mres.data.messages || []);
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    } catch (e) {
+      setPayMsg(e?.response?.data?.message || "Payment failed");
+    } finally {
+      setPaying(false);
     }
   };
 
@@ -288,16 +335,26 @@ export default function Chat() {
     }
   };
 
-  const addMemberToGroup = async (userId) => {
+  const loadMembers = async (groupId) => {
+    try {
+      const res = await groupsApi.members(groupId);
+      setGroupMembers(res.data?.members || []);
+    } catch (e) {
+      setGroupMembers([]);
+    }
+  };
+
+  const addMemberToGroup = async (userId, name) => {
     if (!activeGroup) return;
     setAdding(true);
     setMemberMsg("");
     try {
       const res = await groupsApi.addMembers(activeGroup._id, [userId]);
       const added = res.data?.addedCount ?? 0;
-      setMemberMsg(added > 0 ? "✅ Member added to the group for free" : "✅ Already a member of this group");
+      setMemberMsg(added > 0 ? `✅ ${name || "Member"} was added to ${activeGroup.name}` : "✅ Already a member of this group");
       setMemberQuery("");
       setMemberResults([]);
+      loadMembers(activeGroup._id); // refresh so the added member shows in the list below
     } catch (e) {
       setMemberMsg(e?.response?.data?.message || "Failed to add member");
     } finally {
@@ -329,7 +386,7 @@ export default function Chat() {
 
       {lockedGroup && showSubscribe && (
         <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
+          <div className="bg-white rounded-2xl neo-modal max-w-md w-full p-6">
             <div className="w-12 h-12 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center text-2xl mb-3">
               🔒
             </div>
@@ -364,7 +421,7 @@ export default function Chat() {
       {/* Admin: add a member to this group from inside the chat */}
       {showAddMember && activeGroup && (
         <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
+          <div className="bg-white rounded-2xl neo-modal max-w-md w-full p-6">
             <div className="w-12 h-12 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center text-2xl mb-3">
               ➕
             </div>
@@ -392,7 +449,7 @@ export default function Chat() {
                     <p className="text-xs text-slate-400 truncate">{u.email}</p>
                   </div>
                   <button
-                    onClick={() => addMemberToGroup(u._id)}
+                    onClick={() => addMemberToGroup(u._id, u.fullname)}
                     disabled={adding}
                     className="text-xs px-3 py-1 rounded bg-brand text-white hover:bg-slate-700 disabled:opacity-60"
                   >
@@ -402,6 +459,29 @@ export default function Chat() {
               ))}
             </div>
             {memberMsg && <p className="text-sm text-slate-700 mb-3">{memberMsg}</p>}
+            <div className="mb-4">
+              <p className="text-xs font-semibold text-slate-500 uppercase mb-2">
+                Current members ({groupMembers.length})
+              </p>
+              <div className="max-h-32 overflow-y-auto space-y-2">
+                {groupMembers.length === 0 && (
+                  <p className="text-sm text-slate-400 text-center py-2">No members yet</p>
+                )}
+                {groupMembers.map((m) => (
+                  <div key={m._id} className="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2">
+                    <img
+                      src={m.user?.avatar || "https://via.placeholder.com/32"}
+                      alt=""
+                      className="w-6 h-6 rounded-full object-cover"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-slate-800 truncate">{m.user?.fullname}</p>
+                      <p className="text-xs text-slate-400 truncate">{m.user?.email}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
             <button
               onClick={() => setShowAddMember(false)}
               className="w-full px-4 py-2 rounded-lg bg-slate-200 text-slate-700 font-semibold hover:bg-slate-300 transition"
@@ -411,6 +491,20 @@ export default function Chat() {
           </div>
         </div>
       )}
+
+      {/* Custom mobile-banking payment method picker (demo) */}
+      {showPay && lockedGroup && (
+        <PaymentMethodModal
+          group={lockedGroup}
+          selected={payMethod}
+          onSelect={setPayMethod}
+          onConfirm={confirmPayment}
+          onCancel={() => setShowPay(false)}
+          paying={paying}
+          msg={payMsg}
+        />
+      )}
+
       <div className="flex flex-col md:grid md:grid-cols-3 gap-6">
         {/* Conversation list */}
         <div className={`bg-white rounded-2xl shadow p-4 md:col-span-1 max-h-48 md:max-h-none md:h-[70vh] overflow-y-auto ${mobileView === "chat" ? "hidden md:block" : "block"}`}>

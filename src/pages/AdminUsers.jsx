@@ -16,7 +16,8 @@ export default function AdminUsers() {
       if (filter === "active") params.status = "active";
       if (filter === "inactive") params.status = "inactive";
       if (filter === "approved") params.approved = "true";
-      if (filter === "pending") params.approved = "false";
+      if (filter === "pending") params.approval = "pending";
+      if (filter === "rejected") params.approval = "rejected";
       const res = await usersApi.list(params);
       setUsers(res.data.users || []);
     } catch (e) {
@@ -70,7 +71,7 @@ export default function AdminUsers() {
       {msg && <p className="text-sm text-brand mb-4">{msg}</p>}
 
       <div className="flex gap-2 mb-4 flex-wrap">
-        {["all", "active", "inactive", "approved", "pending"].map((f) => (
+        {["all", "active", "inactive", "approved", "pending", "rejected"].map((f) => (
           <button
             key={f}
             onClick={() => setFilter(f)}
@@ -92,24 +93,34 @@ export default function AdminUsers() {
               <th className="text-left px-4 py-3">Name</th>
               <th className="text-left px-4 py-3">Email</th>
               <th className="text-left px-4 py-3">Role</th>
-              <th className="text-left px-4 py-3">Approved</th>
+              <th className="text-left px-4 py-3">Status</th>
               <th className="text-left px-4 py-3">Active</th>
               <th className="text-left px-4 py-3">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {users.map((u) => (
+            {users.map((u) => {
+              const status = u.status || (u.isApproved ? "approved" : "pending");
+              const statusCls =
+                status === "approved"
+                  ? "bg-brand text-white"
+                  : status === "rejected"
+                  ? "bg-red-100 text-red-700"
+                  : "bg-slate-200 text-slate-700";
+              return (
               <tr key={u._id} className="border-t">
                 <td className="px-4 py-3">{u.fullname}</td>
                 <td className="px-4 py-3">{u.email}</td>
                 <td className="px-4 py-3">{u.role}</td>
-                <td className="px-4 py-3">{u.isApproved ? "✓" : "✗"}</td>
+                <td className="px-4 py-3">
+                  <span className={`text-xs px-2 py-0.5 rounded-full capitalize ${statusCls}`}>{status}</span>
+                </td>
                 <td className="px-4 py-3">{u.isActive ? "✓" : "✗"}</td>
                 <td className="px-4 py-3 flex gap-2 flex-wrap">
-                  {!u.isApproved && (
+                  {status !== "approved" && (
                     <button onClick={() => approve(u._id)} className="text-xs px-2 py-1 rounded bg-brand text-white">Approve</button>
                   )}
-                  {u.isApproved && (
+                  {status === "approved" && (
                     <button onClick={() => reject(u._id)} className="text-xs px-2 py-1 rounded bg-slate-400 text-white">Reject</button>
                   )}
                   <button onClick={() => toggle(u._id)} className="text-xs px-2 py-1 rounded bg-slate-500 text-white">
@@ -117,7 +128,8 @@ export default function AdminUsers() {
                   </button>
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
         {users.length === 0 && <p className="text-center text-slate-500 py-6">No users found</p>}

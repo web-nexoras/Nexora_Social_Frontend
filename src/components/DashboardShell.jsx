@@ -2,6 +2,7 @@ import React from "react";
 import { Outlet } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
+import AdminChatFab from "./AdminChatFab";
 import { useState } from "react";
 
 export default function DashboardShell() {
@@ -33,6 +34,9 @@ export default function DashboardShell() {
           <Outlet />
         </main>
       </div>
+
+      {/* Floating button — message an admin for free from anywhere */}
+      <AdminChatFab />
     </div>
   );
 }

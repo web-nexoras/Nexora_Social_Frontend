@@ -211,16 +211,16 @@ export default function Dashboard() {
       <div className="bg-white rounded-2xl shadow p-6">
         <h2 className="text-xl font-bold text-brand mb-4">Quick Actions</h2>
         <div className="flex flex-wrap gap-3">
-          <Link to="/profile" className="px-4 py-2 rounded-lg bg-brand text-white font-semibold hover:bg-indigo-700 transition">Edit Profile</Link>
-          <Link to="/friends" className="px-4 py-2 rounded-lg bg-accent text-white font-semibold hover:bg-cyan-600 transition">Friends</Link>
-          <Link to="/chat" className="px-4 py-2 rounded-lg bg-slate-800 text-white font-semibold hover:bg-slate-900 transition">Chat</Link>
-          <Link to="/groups" className="px-4 py-2 rounded-lg bg-slate-200 text-slate-700 font-semibold hover:bg-slate-300 transition">Groups</Link>
+          <Link to="/profile" className="px-4 py-2 rounded-lg bg-brand text-white font-semibold hover:bg-slate-700 transition">Edit Profile</Link>
+          <Link to="/friends" className="px-4 py-2 rounded-lg bg-brand text-white font-semibold hover:bg-slate-700 transition">Friends</Link>
+          <Link to="/chat" className="px-4 py-2 rounded-lg bg-brand text-white font-semibold hover:bg-slate-700 transition">Chat</Link>
+          <Link to="/groups" className="px-4 py-2 rounded-lg bg-brand text-white font-semibold hover:bg-slate-700 transition">Groups</Link>
           <Link to="/payments" className="px-4 py-2 rounded-lg bg-brand text-white font-semibold hover:bg-slate-700 transition">Payments</Link>
-          <button onClick={messageAdmin} className="px-4 py-2 rounded-lg bg-accent text-white font-semibold hover:bg-slate-700 transition">Message Admin</button>
+          <button onClick={messageAdmin} className="px-4 py-2 rounded-lg bg-brand text-white font-semibold hover:bg-slate-700 transition">Message Admin</button>
           {isAdmin && (
             <>
-              <Link to="/admin/users" className="px-4 py-2 rounded-lg bg-slate-500 text-white font-semibold hover:bg-slate-600 transition">Admin Users</Link>
-              <Link to="/admin/groups" className="px-4 py-2 rounded-lg bg-slate-500 text-white font-semibold hover:bg-slate-600 transition">Admin Groups</Link>
+              <Link to="/admin/users" className="px-4 py-2 rounded-lg bg-brand text-white font-semibold hover:bg-slate-700 transition">Admin Users</Link>
+              <Link to="/admin/groups" className="px-4 py-2 rounded-lg bg-brand text-white font-semibold hover:bg-slate-700 transition">Admin Groups</Link>
             </>
           )}
         </div>
