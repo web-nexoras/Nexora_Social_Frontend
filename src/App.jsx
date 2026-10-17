@@ -20,18 +20,25 @@ import PaymentCancel from "./pages/PaymentCancel";
 import AdminGroups from "./pages/AdminGroups";
 import AdminUsers from "./pages/AdminUsers";
 import PaymentHistory from "./pages/PaymentHistory";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 
 export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Routes>
-          {/* Public routes */}
+          {/* Auth pages — clean, full screen, no navbar */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+          <Route path="/verify-otp" element={<VerifyOtp />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/reset-password/:token" element={<ResetPassword />} />
+
+          {/* Public pages (with navbar) */}
           <Route element={<PublicLayout />}>
             <Route path="/" element={<Home />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<Signup />} />
-            <Route path="/verify-otp" element={<VerifyOtp />} />
             <Route path="/payment/success" element={<PaymentSuccess />} />
             <Route path="/payment/fail" element={<PaymentFail />} />
             <Route path="/payment/cancel" element={<PaymentCancel />} />

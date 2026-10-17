@@ -6,4 +6,77 @@
 
 body {
   font-family: "Inter", system-ui, "Segoe UI", sans-serif;
+  background: #e8ebf0;
+  color: #1f2937;
+}
+
+/* ---------- Neomorphism (monochrome: black & white) ---------- */
+:root {
+  --neo-bg: #e8ebf0;
+  --neo-dark: #c5c9d2;
+  --neo-light: #ffffff;
+}
+
+.neo-surface {
+  background: var(--neo-bg);
+}
+
+.neo-raised {
+  background: var(--neo-bg);
+  box-shadow: 8px 8px 16px var(--neo-dark), -8px -8px 16px var(--neo-light);
+}
+
+.neo-raised-sm {
+  background: var(--neo-bg);
+  box-shadow: 4px 4px 8px var(--neo-dark), -4px -4px 8px var(--neo-light);
+}
+
+.neo-inset {
+  background: var(--neo-bg);
+  box-shadow: inset 4px 4px 8px var(--neo-dark), inset -4px -4px 8px var(--neo-light);
+}
+
+.neo-btn {
+  background: var(--neo-bg);
+  box-shadow: 6px 6px 12px var(--neo-dark), -6px -6px 12px var(--neo-light);
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.neo-btn:hover {
+  transform: translateY(-1px);
+}
+
+.neo-btn:active {
+  box-shadow: inset 4px 4px 8px var(--neo-dark), inset -4px -4px 8px var(--neo-light);
+  transform: translateY(0);
+}
+
+.neo-input {
+  background: var(--neo-bg);
+  box-shadow: inset 4px 4px 8px var(--neo-dark), inset -4px -4px 8px var(--neo-light);
+}
+
+.neo-input::placeholder {
+  color: #9aa1ad;
+}
+
+.neo-input:focus {
+  outline: none;
+  box-shadow: inset 4px 4px 8px var(--neo-dark), inset -4px -4px 8px var(--neo-light),
+    0 0 0 2px rgba(15, 23, 42, 0.35);
+}
+
+/* ---------- App-wide card / surface overrides ---------- */
+/* White rounded cards become neomorphic raised panels */
+.bg-white.rounded-xl,
+.bg-white.rounded-2xl,
+.bg-white.rounded-3xl {
+  background: var(--neo-bg);
+  box-shadow: 8px 8px 16px var(--neo-dark), -8px -8px 16px var(--neo-light);
+}
+
+/* Light grey blocks become neomorphic inset panels */
+.bg-slate-50 {
+  background: var(--neo-bg);
+  box-shadow: inset 3px 3px 6px var(--neo-dark), inset -3px -3px 6px var(--neo-light);
 }

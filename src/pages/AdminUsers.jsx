@@ -107,10 +107,10 @@ export default function AdminUsers() {
                 <td className="px-4 py-3">{u.isActive ? "✓" : "✗"}</td>
                 <td className="px-4 py-3 flex gap-2 flex-wrap">
                   {!u.isApproved && (
-                    <button onClick={() => approve(u._id)} className="text-xs px-2 py-1 rounded bg-green-500 text-white">Approve</button>
+                    <button onClick={() => approve(u._id)} className="text-xs px-2 py-1 rounded bg-brand text-white">Approve</button>
                   )}
                   {u.isApproved && (
-                    <button onClick={() => reject(u._id)} className="text-xs px-2 py-1 rounded bg-red-500 text-white">Reject</button>
+                    <button onClick={() => reject(u._id)} className="text-xs px-2 py-1 rounded bg-slate-400 text-white">Reject</button>
                   )}
                   <button onClick={() => toggle(u._id)} className="text-xs px-2 py-1 rounded bg-slate-500 text-white">
                     {u.isActive ? "Deactivate" : "Activate"}

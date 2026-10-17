@@ -76,16 +76,16 @@ export default function Dashboard() {
 
   const cards = isAdmin
     ? [
-        { label: "Total Users", value: stats.totalUsers, color: "from-indigo-500 to-brand", to: "/admin/users" },
-        { label: "Pending Approvals", value: stats.pendingApprovals, color: "from-amber-500 to-orange-500", to: "/admin/users" },
-        { label: "Groups", value: stats.groups, color: "from-emerald-500 to-green-500", to: "/admin/groups" },
-        { label: "Conversations", value: stats.conversations, color: "from-cyan-500 to-accent", to: "/chat" },
+        { label: "Total Users", value: stats.totalUsers, color: "from-slate-700 to-slate-900", to: "/admin/users" },
+        { label: "Pending Approvals", value: stats.pendingApprovals, color: "from-slate-400 to-slate-600", to: "/admin/users" },
+        { label: "Groups", value: stats.groups, color: "from-slate-600 to-slate-800", to: "/admin/groups" },
+        { label: "Conversations", value: stats.conversations, color: "from-slate-500 to-slate-700", to: "/chat" },
       ]
     : [
-        { label: "Friends", value: stats.friends, color: "from-indigo-500 to-brand", to: "/friends" },
-        { label: "Conversations", value: stats.conversations, color: "from-cyan-500 to-accent", to: "/chat" },
-        { label: "Groups", value: stats.groups, color: "from-emerald-500 to-green-500", to: "/groups" },
-        { label: "Pending Requests", value: stats.pendingRequests, color: "from-amber-500 to-orange-500", to: "/friends" },
+        { label: "Friends", value: stats.friends, color: "from-slate-700 to-slate-900", to: "/friends" },
+        { label: "Conversations", value: stats.conversations, color: "from-slate-500 to-slate-700", to: "/chat" },
+        { label: "Groups", value: stats.groups, color: "from-slate-600 to-slate-800", to: "/groups" },
+        { label: "Pending Requests", value: stats.pendingRequests, color: "from-slate-400 to-slate-600", to: "/friends" },
       ];
 
   return (
@@ -133,10 +133,10 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => accept(r._id)} className="px-3 py-1.5 rounded-lg bg-green-500 text-white text-sm font-medium hover:bg-green-600 transition">
+                  <button onClick={() => accept(r._id)} className="px-3 py-1.5 rounded-lg bg-brand text-white text-sm font-medium hover:bg-slate-700 transition">
                     Accept
                   </button>
-                  <button onClick={() => reject(r._id)} className="px-3 py-1.5 rounded-lg bg-red-500 text-white text-sm font-medium hover:bg-red-600 transition">
+                  <button onClick={() => reject(r._id)} className="px-3 py-1.5 rounded-lg bg-slate-400 text-white text-sm font-medium hover:bg-slate-500 transition">
                     Reject
                   </button>
                 </div>
@@ -215,12 +215,12 @@ export default function Dashboard() {
           <Link to="/friends" className="px-4 py-2 rounded-lg bg-accent text-white font-semibold hover:bg-cyan-600 transition">Friends</Link>
           <Link to="/chat" className="px-4 py-2 rounded-lg bg-slate-800 text-white font-semibold hover:bg-slate-900 transition">Chat</Link>
           <Link to="/groups" className="px-4 py-2 rounded-lg bg-slate-200 text-slate-700 font-semibold hover:bg-slate-300 transition">Groups</Link>
-          <Link to="/payments" className="px-4 py-2 rounded-lg bg-emerald-500 text-white font-semibold hover:bg-emerald-600 transition">Payments</Link>
-          <button onClick={messageAdmin} className="px-4 py-2 rounded-lg bg-rose-500 text-white font-semibold hover:bg-rose-600 transition">Message Admin</button>
+          <Link to="/payments" className="px-4 py-2 rounded-lg bg-brand text-white font-semibold hover:bg-slate-700 transition">Payments</Link>
+          <button onClick={messageAdmin} className="px-4 py-2 rounded-lg bg-accent text-white font-semibold hover:bg-slate-700 transition">Message Admin</button>
           {isAdmin && (
             <>
-              <Link to="/admin/users" className="px-4 py-2 rounded-lg bg-amber-500 text-white font-semibold hover:bg-amber-600 transition">Admin Users</Link>
-              <Link to="/admin/groups" className="px-4 py-2 rounded-lg bg-amber-500 text-white font-semibold hover:bg-amber-600 transition">Admin Groups</Link>
+              <Link to="/admin/users" className="px-4 py-2 rounded-lg bg-slate-500 text-white font-semibold hover:bg-slate-600 transition">Admin Users</Link>
+              <Link to="/admin/groups" className="px-4 py-2 rounded-lg bg-slate-500 text-white font-semibold hover:bg-slate-600 transition">Admin Groups</Link>
             </>
           )}
         </div>

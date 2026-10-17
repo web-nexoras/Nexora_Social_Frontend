@@ -85,11 +85,11 @@ export default function UserProfile() {
             )}
 
             {!isSelf && rel.isFriend && (
-              <span className="px-4 py-2 rounded-lg bg-emerald-100 text-emerald-700 font-semibold">✓ Friends</span>
+              <span className="px-4 py-2 rounded-lg bg-slate-200 text-slate-700 font-semibold">✓ Friends</span>
             )}
 
             {!isSelf && !rel.isFriend && rel.requestSent && (
-              <span className="px-4 py-2 rounded-lg bg-amber-100 text-amber-700 font-semibold">Request Sent</span>
+              <span className="px-4 py-2 rounded-lg bg-slate-100 text-slate-500 font-semibold">Request Sent</span>
             )}
 
             {!isSelf && !rel.isFriend && rel.requestReceived && (

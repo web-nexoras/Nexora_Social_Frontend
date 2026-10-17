@@ -34,7 +34,7 @@ export default function Navbar() {
   }, []);
 
   return (
-    <nav className="bg-white/80 backdrop-blur shadow-sm sticky top-0 z-50">
+    <nav className="neo-raised sticky top-0 z-50">
       <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
 
 
@@ -49,7 +49,7 @@ export default function Navbar() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search users..."
-              className="w-full pl-10 pr-4 py-2 rounded-full border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand bg-slate-50"
+              className="w-full pl-10 pr-4 py-2 rounded-full neo-input"
             />
           </form>
         )}

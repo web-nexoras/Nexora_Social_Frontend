@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { authApi } from "../api/authApi";
+import AuthShell from "../components/AuthShell";
 
 export default function VerifyOtp() {
   const { verifyOtp } = useAuth();
@@ -9,11 +11,13 @@ export default function VerifyOtp() {
   const [email, setEmail] = useState(location.state?.email || "");
   const [otp, setOtp] = useState("");
   const [error, setError] = useState("");
+  const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setMsg("");
     setLoading(true);
     try {
       await verifyOtp(email, otp);
@@ -25,20 +29,64 @@ export default function VerifyOtp() {
     }
   };
 
+  const resend = async () => {
+    setError("");
+    setMsg("");
+    try {
+      await authApi.resendOtp(email);
+      setMsg("A new OTP has been sent to your email.");
+    } catch (err) {
+      setError(err?.response?.data?.message || "Could not resend OTP");
+    }
+  };
+
   return (
-    <div className="max-w-md mx-auto bg-white rounded-2xl shadow-lg p-8 mt-10">
-      <h1 className="text-3xl font-bold text-brand mb-6 text-center">Verify Email</h1>
-      {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
+    <AuthShell
+      title="Verify Email"
+      subtitle="Enter the 6-digit code we sent to your email to activate your account."
+      footer={
+        <Link to="/signup" className="text-brand font-semibold hover:underline">
+          ← Back to Sign up
+        </Link>
+      }
+    >
+      {msg && <p className="text-emerald-600 text-sm mb-4 text-center bg-emerald-50 rounded-xl py-2 px-3">{msg}</p>}
+      {error && <p className="text-red-500 text-sm mb-4 text-center bg-red-50 rounded-xl py-2 px-3">{error}</p>}
+
       <form onSubmit={handleSubmit} className="space-y-4">
-        <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-brand" required />
-        <input type="text" placeholder="OTP (6 digits)" value={otp} onChange={(e) => setOtp(e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-brand" required />
-        <button type="submit" disabled={loading} className="w-full py-2 rounded-lg bg-brand text-white font-semibold hover:bg-indigo-700 transition disabled:opacity-60">
+        <input
+          type="email"
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          autoComplete="email"
+          className="w-full neo-input rounded-xl px-4 py-3 text-slate-700 text-sm"
+          required
+        />
+        <input
+          type="text"
+          inputMode="numeric"
+          placeholder="OTP (6 digits)"
+          value={otp}
+          onChange={(e) => setOtp(e.target.value)}
+          className="w-full neo-input rounded-xl px-4 py-3 text-slate-700 text-sm tracking-widest text-center"
+          required
+        />
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full py-3 rounded-xl bg-gradient-to-r from-brand to-indigo-600 text-white text-sm font-semibold neo-btn disabled:opacity-60"
+        >
           {loading ? "Verifying..." : "Verify OTP"}
         </button>
+        <button
+          type="button"
+          onClick={resend}
+          className="w-full py-2 rounded-xl text-brand text-xs font-semibold hover:underline"
+        >
+          Resend OTP
+        </button>
       </form>
-      <p className="text-center text-sm text-slate-500 mt-4">
-        Back to <Link to="/signup" className="text-brand font-medium">Signup</Link>
-      </p>
-    </div>
+    </AuthShell>
   );
 }

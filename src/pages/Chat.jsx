@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { chatApi } from "../api/chatApi";
+import { groupsApi, paymentsApi } from "../api/groupsApi";
 import { io } from "socket.io-client";
 
 const SOCKET_URL = import.meta.env.VITE_API_URL?.replace("/api/v1", "") || "http://localhost:5000";
@@ -21,6 +22,10 @@ export default function Chat() {
   const [highlighted, setHighlighted] = useState(new Set());
   const [unreadIds, setUnreadIds] = useState(new Set());
   const [toast, setToast] = useState("");
+  const [lockedGroup, setLockedGroup] = useState(null);
+  const [showSubscribe, setShowSubscribe] = useState(false);
+  const [subscribing, setSubscribing] = useState(false);
+  const [subscribeMsg, setSubscribeMsg] = useState("");
   const socketRef = useRef(null);
   const bottomRef = useRef(null);
 
@@ -90,6 +95,33 @@ export default function Chat() {
     load();
   }, [activeId]);
 
+  // Detect if the active conversation is a group the user is NOT a member of
+  useEffect(() => {
+    let alive = true;
+    if (!activeId) {
+      setLockedGroup(null);
+      return;
+    }
+    (async () => {
+      try {
+        const res = await groupsApi.byConversation(activeId);
+        if (!alive) return;
+        if (res.data?.isMember) {
+          setLockedGroup(null);
+        } else {
+          setLockedGroup(res.data.group);
+          setShowSubscribe(true);
+        }
+      } catch (e) {
+        // Not a group conversation (direct chat) — nothing locked
+        if (alive) setLockedGroup(null);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [activeId]);
+
   useEffect(() => {
     if (activeId) setMobileView("chat");
   }, [activeId]);
@@ -139,6 +171,10 @@ export default function Chat() {
 
   const sendMessage = async (e) => {
     e.preventDefault();
+    if (lockedGroup) {
+      setShowSubscribe(true);
+      return;
+    }
     if (!text.trim() || !activeId) return;
     try {
       const res = await chatApi.send(activeId, text);
@@ -152,6 +188,24 @@ export default function Chat() {
       setText("");
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const subscribeGroup = async () => {
+    if (!lockedGroup) return;
+    setSubscribing(true);
+    setSubscribeMsg("");
+    try {
+      const res = await paymentsApi.initSubscription(lockedGroup._id);
+      if (res.data?.gatewayPageURL) {
+        window.location.href = res.data.gatewayPageURL;
+      } else {
+        setSubscribeMsg(res.data?.message || "Failed to start payment");
+      }
+    } catch (e) {
+      setSubscribeMsg(e?.response?.data?.message || "Subscription failed");
+    } finally {
+      setSubscribing(false);
     }
   };
 
@@ -172,8 +226,42 @@ export default function Chat() {
   return (
     <div className="max-w-6xl mx-auto mt-6">
       {toast && (
-        <div className="fixed top-20 right-4 z-50 bg-white border border-amber-300 shadow-lg rounded-xl px-4 py-3 text-sm text-slate-800">
+        <div className="fixed top-20 right-4 z-50 bg-slate-900 border border-slate-700 shadow-lg rounded-xl px-4 py-3 text-sm text-white">
           🔔 {toast}
+        </div>
+      )}
+
+      {lockedGroup && showSubscribe && (
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
+            <div className="w-12 h-12 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center text-2xl mb-3">
+              🔒
+            </div>
+            <h3 className="text-xl font-bold text-brand mb-2">Join this group</h3>
+            <p className="text-slate-600 mb-3">
+              You are not a member of <strong>{lockedGroup.name}</strong> yet. If you want to be
+              added to this group, you can subscribe.
+            </p>
+            <p className="text-sm text-slate-500 mb-6">
+              After a successful payment, the admin will add you to the group.
+            </p>
+            {subscribeMsg && <p className="text-sm text-red-500 mb-4">{subscribeMsg}</p>}
+            <div className="flex gap-3">
+              <button
+                onClick={subscribeGroup}
+                disabled={subscribing}
+                className="flex-1 px-4 py-2 rounded-lg bg-accent text-white font-semibold hover:bg-cyan-600 transition disabled:opacity-60"
+              >
+                {subscribing ? "Redirecting..." : "Subscribe"}
+              </button>
+              <button
+                onClick={() => setShowSubscribe(false)}
+                className="flex-1 px-4 py-2 rounded-lg bg-slate-200 text-slate-700 font-semibold hover:bg-slate-300 transition"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
       <div className="flex flex-col md:grid md:grid-cols-3 gap-6">
@@ -196,7 +284,7 @@ export default function Chat() {
                   });
                 }}
                 className={`w-full text-left p-3 rounded-xl mb-2 transition flex items-center gap-3 ${
-                  unread ? "bg-amber-50 ring-2 ring-amber-300" : activeId === c._id ? "bg-indigo-100" : "hover:bg-slate-100"
+                  unread ? "bg-slate-200 ring-2 ring-slate-400" : activeId === c._id ? "bg-slate-300" : "hover:bg-slate-100"
                 }`}
               >
                 <img src={other?.avatar || "https://via.placeholder.com/40"} alt="" className="w-10 h-10 rounded-full object-cover" />
@@ -227,11 +315,14 @@ export default function Chat() {
               <img src={otherParticipant.avatar || "https://via.placeholder.com/40"} alt="" className="w-9 h-9 rounded-full object-cover" />
             )}
             <h2 className="text-xl font-bold text-brand">
-              {activeConv
+              {lockedGroup
+                ? lockedGroup.name
+                : activeConv
                 ? activeConv.type === "group"
                   ? activeConv.groupName
                   : otherParticipant?.fullname
                 : "Select a conversation"}
+              {lockedGroup && <span className="ml-2 text-xs font-semibold text-slate-500">🔒 Not joined</span>}
             </h2>
           </div>
           <div className="flex-1 overflow-y-auto p-6 space-y-4">
@@ -270,17 +361,31 @@ export default function Chat() {
             })}
             <div ref={bottomRef} />
           </div>
-          <form onSubmit={sendMessage} className="p-4 border-t flex gap-2">
-            <input
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder="Type a message..."
-              className="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-brand"
-            />
-            <button type="submit" className="px-4 py-2 rounded-lg bg-brand text-white font-semibold hover:bg-indigo-700 transition">
-              Send
-            </button>
-          </form>
+          {lockedGroup ? (
+            <div className="p-4 border-t text-center">
+              <p className="text-sm text-slate-500 mb-2">
+                You need a subscription to send messages in this group.
+              </p>
+              <button
+                onClick={() => setShowSubscribe(true)}
+                className="px-4 py-2 rounded-lg bg-accent text-white font-semibold hover:bg-cyan-600 transition"
+              >
+                Subscribe to Join
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={sendMessage} className="p-4 border-t flex gap-2">
+              <input
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                placeholder="Type a message..."
+                className="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-brand"
+              />
+              <button type="submit" className="px-4 py-2 rounded-lg bg-brand text-white font-semibold hover:bg-indigo-700 transition">
+                Send
+              </button>
+            </form>
+          )}
         </div>
       </div>
     </div>

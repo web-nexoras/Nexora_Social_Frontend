@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import AuthShell from "../components/AuthShell";
+import PasswordInput from "../components/PasswordInput";
 
 export default function Signup() {
   const { signup } = useAuth();
@@ -26,20 +28,59 @@ export default function Signup() {
   };
 
   return (
-    <div className="max-w-md mx-auto bg-white rounded-2xl shadow-lg p-8 mt-10">
-      <h1 className="text-3xl font-bold text-brand mb-6 text-center">Create Account</h1>
-      {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
+    <AuthShell
+      title="Create Account"
+      subtitle="Join Nexora Social to connect with friends, chat in realtime, and unlock premium groups."
+      footer={
+        <>
+          Already have an account?{" "}
+          <Link to="/login" className="text-brand font-semibold hover:underline">
+            Sign in
+          </Link>
+        </>
+      }
+    >
+      {error && (
+        <p className="text-red-500 text-sm mb-4 text-center bg-red-50 rounded-xl py-2 px-3">
+          {error}
+        </p>
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-4">
-        <input name="fullname" placeholder="Full Name" value={form.fullname} onChange={handleChange} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-brand" required />
-        <input name="email" type="email" placeholder="Email" value={form.email} onChange={handleChange} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-brand" required />
-        <input name="password" type="password" placeholder="Password (min 6)" value={form.password} onChange={handleChange} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-brand" required />
-        <button type="submit" disabled={loading} className="w-full py-2 rounded-lg bg-brand text-white font-semibold hover:bg-indigo-700 transition disabled:opacity-60">
-          {loading ? "Creating..." : "Sign Up"}
+        <input
+          name="fullname"
+          placeholder="Full Name"
+          value={form.fullname}
+          onChange={handleChange}
+          autoComplete="name"
+          className="w-full neo-input rounded-xl px-4 py-3 text-slate-700 text-sm"
+          required
+        />
+        <input
+          name="email"
+          type="email"
+          placeholder="Email"
+          value={form.email}
+          onChange={handleChange}
+          autoComplete="email"
+          className="w-full neo-input rounded-xl px-4 py-3 text-slate-700 text-sm"
+          required
+        />
+        <PasswordInput
+          name="password"
+          value={form.password}
+          onChange={handleChange}
+          placeholder="Password (min 8)"
+          autoComplete="new-password"
+        />
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full py-3 rounded-xl bg-gradient-to-r from-brand to-indigo-600 text-white text-sm font-semibold neo-btn disabled:opacity-60"
+        >
+          {loading ? "Creating..." : "Create Account"}
         </button>
       </form>
-      <p className="text-center text-sm text-slate-500 mt-4">
-        Already have account? <Link to="/login" className="text-brand font-medium">Login</Link>
-      </p>
-    </div>
+    </AuthShell>
   );
 }

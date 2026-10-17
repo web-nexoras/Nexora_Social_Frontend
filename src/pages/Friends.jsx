@@ -82,7 +82,7 @@ export default function Friends() {
             >
               {tab}
               {tab === "Incoming" && incoming.length > 0 && (
-                <span className="ml-2 text-xs bg-red-500 text-white px-2 py-0.5 rounded-full">{incoming.length}</span>
+                <span className="ml-2 text-xs bg-slate-700 text-white px-2 py-0.5 rounded-full">{incoming.length}</span>
               )}
               {tab === "Sent" && sent.length > 0 && (
                 <span className="ml-2 text-xs bg-slate-500 text-white px-2 py-0.5 rounded-full">{sent.length}</span>
@@ -134,10 +134,10 @@ export default function Friends() {
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={() => accept(r._id)} className="flex-1 py-1.5 rounded-lg bg-green-500 text-white text-sm font-medium hover:bg-green-600 transition">
+                    <button onClick={() => accept(r._id)} className="flex-1 py-1.5 rounded-lg bg-brand text-white text-sm font-medium hover:bg-slate-700 transition">
                       Accept
                     </button>
-                    <button onClick={() => reject(r._id)} className="flex-1 py-1.5 rounded-lg bg-red-500 text-white text-sm font-medium hover:bg-red-600 transition">
+                    <button onClick={() => reject(r._id)} className="flex-1 py-1.5 rounded-lg bg-slate-400 text-white text-sm font-medium hover:bg-slate-500 transition">
                       Reject
                     </button>
                   </div>

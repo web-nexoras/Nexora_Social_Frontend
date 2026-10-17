@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import AuthShell from "../components/AuthShell";
+import PasswordInput from "../components/PasswordInput";
 
 export default function Login() {
   const { login } = useAuth();
@@ -16,7 +18,7 @@ export default function Login() {
     setLoading(true);
     try {
       await login(email, password);
-      navigate("/profile");
+      navigate("/dashboard");
     } catch (err) {
       setError(err?.response?.data?.message || "Login failed");
     } finally {
@@ -25,37 +27,59 @@ export default function Login() {
   };
 
   return (
-    <div className="max-w-md mx-auto bg-white rounded-2xl shadow-lg p-8 mt-10">
-      <h1 className="text-3xl font-bold text-brand mb-6 text-center">Welcome Back</h1>
-      {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
+    <AuthShell
+      title="Sign In"
+      subtitle="Nexora Social is a realtime social platform — connect with friends, chat instantly, and unlock premium groups with secure subscriptions."
+      footer={
+        <>
+          Don&apos;t have an account?{" "}
+          <Link to="/signup" className="text-brand font-semibold hover:underline">
+            Create account
+          </Link>
+        </>
+      }
+    >
+      {error && (
+        <p className="text-red-500 text-sm mb-4 text-center bg-red-50 rounded-xl py-2 px-3">
+          {error}
+        </p>
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-4">
         <input
           type="email"
           placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-brand"
+          autoComplete="email"
+          className="w-full neo-input rounded-xl px-4 py-3 text-slate-700 text-sm"
           required
         />
-        <input
-          type="password"
-          placeholder="Password"
+
+        <PasswordInput
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-brand"
-          required
+          placeholder="Password"
+          autoComplete="current-password"
         />
+
+        <div className="flex items-center justify-between text-xs px-1">
+          <Link to="/forgot-password" className="text-brand font-medium hover:underline">
+            Forgot password?
+          </Link>
+          <Link to="/reset-password" className="text-slate-500 hover:text-brand hover:underline">
+            Reset password
+          </Link>
+        </div>
+
         <button
           type="submit"
           disabled={loading}
-          className="w-full py-2 rounded-lg bg-brand text-white font-semibold hover:bg-indigo-700 transition disabled:opacity-60"
+          className="w-full py-3 rounded-xl bg-gradient-to-r from-brand to-indigo-600 text-white text-sm font-semibold neo-btn disabled:opacity-60"
         >
           {loading ? "Signing in..." : "Sign In"}
         </button>
       </form>
-      <p className="text-center text-sm text-slate-500 mt-4">
-        No account? <Link to="/signup" className="text-brand font-medium">Sign up</Link>
-      </p>
-    </div>
+    </AuthShell>
   );
 }

@@ -70,7 +70,7 @@ export default function Topbar({ onMenuClick }) {
   };
 
   return (
-    <div className="flex items-center justify-between gap-4 px-6 py-3 bg-white/80 backdrop-blur shadow-sm">
+    <div className="flex items-center justify-between gap-4 px-6 py-3 neo-raised">
       <button
         onClick={onMenuClick}
         className="md:hidden p-2 rounded-lg hover:bg-slate-100"
@@ -97,7 +97,7 @@ export default function Topbar({ onMenuClick }) {
             onChange={(e) => setQuery(e.target.value)}
             onFocus={() => query.trim() && setShowResults(true)}
             placeholder="Search users..."
-            className="w-full pl-10 pr-4 py-2 rounded-full border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand bg-slate-50"
+            className="w-full pl-10 pr-4 py-2 rounded-full neo-input"
           />
         </form>
 
@@ -127,11 +127,11 @@ export default function Topbar({ onMenuClick }) {
                 <span
                   className={`text-[10px] px-2 py-0.5 rounded-full font-semibold shrink-0 ${
                     u.isFriend
-                      ? "bg-emerald-100 text-emerald-700"
+                      ? "bg-slate-700 text-white"
                       : u.requestSent
-                      ? "bg-amber-100 text-amber-700"
+                      ? "bg-slate-300 text-slate-700"
                       : u.requestReceived
-                      ? "bg-cyan-100 text-cyan-700"
+                      ? "bg-slate-200 text-slate-700"
                       : "bg-slate-100 text-slate-500"
                   }`}
                 >

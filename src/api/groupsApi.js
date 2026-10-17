@@ -4,9 +4,11 @@ export const groupsApi = {
   list: () => api.get("/groups"),
   create: (data) => api.post("/groups", data),
   get: (id) => api.get(`/groups/${id}`),
+  byConversation: (conversationId) => api.get(`/groups/by-conversation/${conversationId}`),
   update: (id, data) => api.patch(`/groups/${id}`, data),
   remove: (id) => api.delete(`/groups/${id}`),
   members: (id) => api.get(`/groups/${id}/members`),
+  subscribers: (id) => api.get(`/groups/${id}/subscribers`),
   addMembers: (id, userIds) => api.post(`/groups/${id}/members`, { userIds }),
 };
 

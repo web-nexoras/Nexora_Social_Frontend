@@ -37,7 +37,7 @@ export default function PaymentHistory() {
                 <p className="text-sm">Status: <span className="font-semibold">{s.status}</span></p>
                 {s.expiresAt && <p className="text-sm">Expires: {new Date(s.expiresAt).toLocaleDateString()}</p>}
               </div>
-              <span className={`px-3 py-1 rounded-full text-xs font-semibold ${s.status === "active" ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-600"}`}>
+              <span className={`px-3 py-1 rounded-full text-xs font-semibold ${s.status === "active" ? "bg-slate-700 text-white" : "bg-slate-100 text-slate-600"}`}>
                 {s.status}
               </span>
             </div>
