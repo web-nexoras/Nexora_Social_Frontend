@@ -12,6 +12,8 @@ export default function VerifyOtp() {
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(false);
+  // Dev-only: OTP surfaced directly by the backend so verification works without a deliverable inbox
+  const [devOtp, setDevOtp] = useState(location.state?.devOtp || "");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -32,7 +34,8 @@ export default function VerifyOtp() {
     setError("");
     setMsg("");
     try {
-      await authApi.resendOtp(email);
+      const data = await authApi.resendOtp(email);
+      if (data?.data?.devOtp) setDevOtp(data.data.devOtp);
       setMsg("A new OTP has been sent to your email.");
     } catch (err) {
       setError(err?.response?.data?.message || "Could not resend OTP");
@@ -57,6 +60,19 @@ export default function VerifyOtp() {
     >
       {msg && <p className="text-emerald-600 text-sm mb-4 text-center bg-emerald-50 rounded-xl py-2 px-3">{msg}</p>}
       {error && <p className="text-red-500 text-sm mb-4 text-center bg-red-50 rounded-xl py-2 px-3">{error}</p>}
+
+      {devOtp && (
+        <div className="mb-4 text-center bg-slate-50 border border-slate-200 rounded-xl py-2 px-3">
+          <p className="text-xs text-slate-500 mb-1">Dev OTP (email may not be deliverable):</p>
+          <button
+            type="button"
+            onClick={() => setOtp(devOtp)}
+            className="text-brand text-lg font-bold tracking-widest hover:underline"
+          >
+            {devOtp} — tap to fill →
+          </button>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <input

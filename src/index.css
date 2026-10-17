@@ -76,8 +76,19 @@ body {
 
 .neo-input:focus {
   outline: none;
+  border-color: #9aa3af;
   box-shadow: inset 4px 4px 8px var(--neo-dark), inset -4px -4px 8px var(--neo-light),
-    0 0 0 2px rgba(30, 41, 59, 0.35);
+    0 0 0 2px rgba(148, 163, 184, 0.55);
+}
+
+/* ---------- Inputs: grey border + grey focus ring (never black) ---------- */
+/* Covers plain `border` inputs and overrides the dark `focus:ring-brand`. */
+input:not(.neo-input):focus,
+textarea:not(.neo-input):focus,
+select:not(.neo-input):focus {
+  outline: none;
+  border-color: #9aa3af;
+  box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.5);
 }
 
 /* ---------- App-wide card / surface overrides ---------- */
@@ -142,6 +153,18 @@ body {
 .dark .hover\:bg-slate-100:hover { background-color: #262b33; }
 .dark .hover\:bg-slate-200:hover { background-color: #2e343d; }
 .dark .hover\:bg-slate-300:hover { background-color: #3a414b; }
+
+/* ---------- Mobile nav drawer ---------- */
+/* On small screens the sidebar becomes a fixed drawer — use a soft halo shadow
+   instead of the heavy offset neomorphism shadow (which added a harsh dark edge). */
+@media (max-width: 767px) {
+  .app-sidebar.neo-raised {
+    box-shadow: 0 0 32px rgba(15, 23, 42, 0.22);
+  }
+  .dark .app-sidebar.neo-raised {
+    box-shadow: 0 0 32px rgba(0, 0, 0, 0.5);
+  }
+}
 
 /* Active nav pills keep contrast */
 .dark .bg-brand { background-color: #3b4657; }

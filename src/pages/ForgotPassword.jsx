@@ -8,15 +8,19 @@ export default function ForgotPassword() {
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [devLink, setDevLink] = useState("");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMsg("");
     setError("");
+    setDevLink("");
     setLoading(true);
     try {
       const res = await authApi.forgotPassword(email);
       setMsg(res.data?.message || "If an account exists, a reset link has been sent.");
+      // Dev-only: backend exposes the link directly so you don't need a deliverable inbox
+      if (res.data?.devResetLink) setDevLink(res.data.devResetLink);
     } catch (err) {
       setError(err?.response?.data?.message || "Failed to send reset link");
     } finally {
@@ -36,6 +40,15 @@ export default function ForgotPassword() {
     >
       {msg && <p className="text-emerald-600 text-sm mb-4 text-center bg-emerald-50 rounded-xl py-2 px-3">{msg}</p>}
       {error && <p className="text-red-500 text-sm mb-4 text-center bg-red-50 rounded-xl py-2 px-3">{error}</p>}
+
+      {devLink && (
+        <div className="mb-4 text-center bg-slate-50 border border-slate-200 rounded-xl py-2 px-3">
+          <p className="text-xs text-slate-500 mb-1">Dev reset link (email may not be deliverable):</p>
+          <Link to={devLink.replace(/^https?:\/\/[^/]+/, "")} className="text-brand text-sm font-semibold break-all hover:underline">
+            Open reset page →
+          </Link>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <input

@@ -18,8 +18,8 @@ export default function Signup() {
     setError("");
     setLoading(true);
     try {
-      await signup(form.fullname, form.email, form.password);
-      navigate("/verify-otp", { state: { email: form.email } });
+      const data = await signup(form.fullname, form.email, form.password);
+      navigate("/verify-otp", { state: { email: form.email, devOtp: data?.devOtp } });
     } catch (err) {
       setError(err?.response?.data?.message || "Signup failed");
     } finally {

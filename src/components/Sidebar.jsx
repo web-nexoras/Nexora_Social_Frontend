@@ -15,14 +15,14 @@ export default function Sidebar({ onNavigate }) {
   const { theme, setTheme } = useTheme();
 
   return (
-    <aside className="neo-raised p-4 flex-1 min-h-screen overflow-y-auto flex flex-col" onClick={onNavigate}>
+    <aside className="neo-raised app-sidebar p-4 flex-1 min-h-screen overflow-y-auto flex flex-col" onClick={onNavigate}>
       <div className="mb-6">
-        <h2 className="text-lg font-bold text-brand">{user?.role === "admin" ? "Nexora Social Admin" : "Nexora Social"}</h2>
+        <h2 className="text-lg font-extrabold text-black">{user?.role === "admin" ? "Nexora Social Admin" : "Nexora Social"}</h2>
         <p className="text-xs text-slate-400 mt-1">
           {user?.role === "admin" ? "Admin" : "User"}
         </p>
       </div>
-      <nav className="space-y-4">
+      <nav className="space-y-2 lg:space">
         <NavLink to="/dashboard" className={linkClass}>
           🏠 Overview
         </NavLink>

@@ -50,13 +50,14 @@ export default function UserProfile() {
   return (
     <div className="max-w-3xl mx-auto mt-6">
       <div className="bg-white rounded-2xl shadow overflow-hidden">
-        <div className="h-32 bg-gradient-to-r from-brand to-indigo-700" />
+        {/* Cover banner — soft light-purple gradient */}
+        <div className="h-36 bg-gradient-to-r from-blue-300 to-fuchsia-100" />
         <div className="px-6 pb-6">
           <div className="flex items-end gap-4 -mt-12">
             <img
               src={user.avatar || "https://via.placeholder.com/96"}
               alt={user.fullname}
-              className="w-24 h-24 rounded-full border-4 border-white object-cover bg-slate-200"
+              className="w-24 h-24 rounded-full border-4 border-white object-cover bg-slate-200 shadow-lg"
             />
             <div className="pb-2">
               <h1 className="text-2xl font-bold text-slate-800">{user.fullname}</h1>
