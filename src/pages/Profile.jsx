@@ -68,18 +68,19 @@ export default function Profile() {
   return (
     <div className="max-w-3xl mx-auto mt-6 px-4 sm:px-0">
       <div className="bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden">
-        {/* Dark Cover banner matching admin overview */}
-        <div className="relative h-44 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 overflow-hidden border-b border-slate-800/80">
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-600/25 via-slate-900/40 to-transparent"></div>
+        {/* Dark Cover banner — clean monochrome gradient */}
+        <div className="relative h-40 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-700 overflow-hidden">
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-white/15 via-transparent to-transparent"></div>
+          <div className="absolute -bottom-24 -right-10 w-80 h-80 rounded-full bg-white/5 blur-3xl"></div>
           <div className="absolute top-4 right-4 flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/10 px-3 py-1 rounded-full text-xs font-semibold text-slate-200">
-            <FiShield className="text-indigo-400" />
+            <FiShield className="text-slate-300" />
             <span className="capitalize">{user.role} Settings</span>
           </div>
         </div>
 
         {/* Profile Content */}
         <div className="px-6 sm:px-8 pb-8">
-          <div className="flex flex-col sm:flex-row sm:items-end gap-4 -mt-16 mb-6">
+          <div className="-mt-14 mb-6">
             {/* Avatar container with photo upload overlay */}
             <div className="relative w-28 h-28 rounded-full border-4 border-white shadow-2xl overflow-hidden bg-slate-900 shrink-0 group">
               {preview && !imgError ? (
@@ -90,7 +91,7 @@ export default function Profile() {
                   className="w-full h-full object-cover"
                 />
               ) : (
-                <div className="w-full h-full bg-gradient-to-br from-indigo-600 via-indigo-700 to-slate-900 flex items-center justify-center text-white text-2xl font-black tracking-wider">
+                <div className="w-full h-full bg-gradient-to-br from-slate-600 via-slate-700 to-slate-900 flex items-center justify-center text-white text-2xl font-black tracking-wider">
                   {initials}
                 </div>
               )}
@@ -101,7 +102,7 @@ export default function Profile() {
               </label>
             </div>
 
-            <div className="pb-1">
+            <div className="mt-3">
               <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">{user.fullname}</h1>
               <p className="text-sm text-slate-500 flex items-center gap-1.5 mt-0.5">
                 <FiMail className="text-slate-400" /> {user.email}
