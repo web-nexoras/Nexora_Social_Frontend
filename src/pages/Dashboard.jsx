@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import api from "../api/axios";
 import { friendsApi } from "../api/friendsApi";
 import { usersApi } from "../api/usersApi";
+import { FiArrowRight, FiCheck, FiX } from "react-icons/fi";
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -151,7 +152,7 @@ export default function Dashboard() {
         <div className="bg-white rounded-2xl shadow p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold text-brand">Friend Suggestions</h2>
-            <Link to="/friends" className="text-sm text-brand font-medium hover:underline">View all →</Link>
+            <Link to="/friends" className="inline-flex items-center gap-1 text-sm text-brand font-medium hover:underline">View all <FiArrowRight /></Link>
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {suggestions.slice(0, 6).map((u) => (
@@ -177,7 +178,7 @@ export default function Dashboard() {
         <div className="bg-white rounded-2xl shadow p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold text-brand">All Users</h2>
-            <Link to="/admin/users" className="text-sm text-brand font-medium hover:underline">Manage →</Link>
+            <Link to="/admin/users" className="inline-flex items-center gap-1 text-sm text-brand font-medium hover:underline">Manage <FiArrowRight /></Link>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -196,8 +197,20 @@ export default function Dashboard() {
                     <td className="px-4 py-3">{u.fullname}</td>
                     <td className="px-4 py-3">{u.email}</td>
                     <td className="px-4 py-3">{u.role}</td>
-                    <td className="px-4 py-3">{u.isApproved ? "✓" : "✗"}</td>
-                    <td className="px-4 py-3">{u.isActive ? "✓" : "✗"}</td>
+                    <td className="px-4 py-3">
+                      {u.isApproved ? (
+                        <FiCheck className="text-green-600 inline" aria-label="Approved" />
+                      ) : (
+                        <FiX className="text-red-500 inline" aria-label="Not approved" />
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {u.isActive ? (
+                        <FiCheck className="text-green-600 inline" aria-label="Active" />
+                      ) : (
+                        <FiX className="text-red-500 inline" aria-label="Inactive" />
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -239,7 +252,7 @@ export default function Dashboard() {
                 </p>
                 <p className="text-xs text-slate-400 truncate">{c.lastMessage?.text || "No messages yet"}</p>
               </div>
-              <span className="text-xs text-brand font-semibold">Open →</span>
+              <span className="inline-flex items-center gap-1 text-xs text-brand font-semibold">Open <FiArrowRight /></span>
             </Link>
           ))}
         </div>

@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { FiArrowLeft, FiArrowRight } from "react-icons/fi";
 import { Link } from "react-router-dom";
 import { authApi } from "../api/authApi";
 import AuthShell from "../components/AuthShell";
@@ -33,8 +34,8 @@ export default function ForgotPassword() {
       title="Forgot Password"
       subtitle="Enter your email and we'll send you a secure link to reset your password."
       footer={
-        <Link to="/login" className="text-brand font-semibold hover:underline">
-          ← Back to Sign In
+        <Link to="/login" className="inline-flex items-center gap-1 text-brand font-semibold hover:underline">
+          <FiArrowLeft /> Back to Sign In
         </Link>
       }
     >
@@ -44,8 +45,8 @@ export default function ForgotPassword() {
       {devLink && (
         <div className="mb-4 text-center bg-slate-50 border border-slate-200 rounded-xl py-2 px-3">
           <p className="text-xs text-slate-500 mb-1">Dev reset link (email may not be deliverable):</p>
-          <Link to={devLink.replace(/^https?:\/\/[^/]+/, "")} className="text-brand text-sm font-semibold break-all hover:underline">
-            Open reset page →
+          <Link to={devLink.replace(/^https?:\/\/[^/]+/, "")} className="inline-flex items-center gap-1 text-brand text-sm font-semibold break-all hover:underline">
+            Open reset page <FiArrowRight />
           </Link>
         </div>
       )}

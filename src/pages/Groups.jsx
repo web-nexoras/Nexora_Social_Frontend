@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { FiCheck } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 import { groupsApi } from "../api/groupsApi";
 import { useAuth } from "../context/AuthContext";
@@ -57,7 +58,11 @@ export default function Groups() {
               <p className="text-sm mt-3">
                 <span className="font-semibold">Price:</span> {g.price} {g.currency}
               </p>
-              {g.isMember && <p className="text-sm text-slate-600 mt-1">✓ Member</p>}
+              {g.isMember && (
+                <p className="inline-flex items-center gap-1 text-sm text-slate-600 mt-1">
+                  <FiCheck className="text-green-600" /> Member
+                </p>
+              )}
               {g.membership?.premiumExpiresAt && (
                 <p className="text-xs text-slate-400 mt-1">
                   Expires: {new Date(g.membership.premiumExpiresAt).toLocaleDateString()}

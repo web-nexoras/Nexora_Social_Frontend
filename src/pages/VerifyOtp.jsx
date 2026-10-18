@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { FiArrowLeft, FiArrowRight } from "react-icons/fi";
 import { useLocation, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { authApi } from "../api/authApi";
@@ -48,12 +49,12 @@ export default function VerifyOtp() {
       subtitle="Enter the 6-digit code we sent to your email to activate your account."
       footer={
         msg ? (
-          <Link to="/login" className="text-brand font-semibold hover:underline">
-            Go to Sign In →
+          <Link to="/login" className="inline-flex items-center gap-1 text-brand font-semibold hover:underline">
+            Go to Sign In <FiArrowRight />
           </Link>
         ) : (
-          <Link to="/signup" className="text-brand font-semibold hover:underline">
-            ← Back to Sign Up
+          <Link to="/signup" className="inline-flex items-center gap-1 text-brand font-semibold hover:underline">
+            <FiArrowLeft /> Back to Sign Up
           </Link>
         )
       }
@@ -67,9 +68,9 @@ export default function VerifyOtp() {
           <button
             type="button"
             onClick={() => setOtp(devOtp)}
-            className="text-brand text-lg font-bold tracking-widest hover:underline"
+            className="inline-flex items-center gap-1 text-brand text-lg font-bold tracking-widest hover:underline"
           >
-            {devOtp} — tap to fill →
+            {devOtp} — tap to fill <FiArrowRight />
           </button>
         </div>
       )}

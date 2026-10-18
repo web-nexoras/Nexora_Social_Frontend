@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { usersApi } from "../api/usersApi";
 import { useAuth } from "../context/AuthContext";
+import { FiCheck, FiX } from "react-icons/fi";
 
 export default function AdminUsers() {
   const { user } = useAuth();
@@ -115,7 +116,13 @@ export default function AdminUsers() {
                 <td className="px-4 py-3">
                   <span className={`text-xs px-2 py-0.5 rounded-full capitalize ${statusCls}`}>{status}</span>
                 </td>
-                <td className="px-4 py-3">{u.isActive ? "✓" : "✗"}</td>
+                <td className="px-4 py-3">
+                  {u.isActive ? (
+                    <FiCheck className="text-green-600 inline" aria-label="Active" />
+                  ) : (
+                    <FiX className="text-red-500 inline" aria-label="Inactive" />
+                  )}
+                </td>
                 <td className="px-4 py-3 flex gap-2 flex-wrap">
                   {status !== "approved" && (
                     <button onClick={() => approve(u._id)} className="text-xs px-2 py-1 rounded bg-brand text-white">Approve</button>

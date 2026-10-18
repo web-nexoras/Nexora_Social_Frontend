@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { FiCheck } from "react-icons/fi";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { usersApi } from "../api/usersApi";
 import { friendsApi } from "../api/friendsApi";
@@ -34,7 +35,7 @@ export default function UserProfile() {
   const addFriend = async () => {
     try {
       await friendsApi.sendRequest(id);
-      setMsg("Friend request sent ✅");
+      setMsg("Friend request sent successfully");
       setRelationship({ ...(relationship || {}), requestSent: true });
     } catch (e) {
       setMsg(e?.response?.data?.message || "Could not send request");
@@ -86,7 +87,9 @@ export default function UserProfile() {
             )}
 
             {!isSelf && rel.isFriend && (
-              <span className="px-4 py-2 rounded-lg bg-slate-200 text-slate-700 font-semibold">✓ Friends</span>
+              <span className="inline-flex items-center gap-1 px-4 py-2 rounded-lg bg-slate-200 text-slate-700 font-semibold">
+                <FiCheck className="text-green-600" /> Friends
+              </span>
             )}
 
             {!isSelf && !rel.isFriend && rel.requestSent && (

@@ -6,6 +6,17 @@ import { groupsApi, paymentsApi } from "../api/groupsApi";
 import { usersApi } from "../api/usersApi";
 import PaymentMethodModal from "../components/PaymentMethodModal";
 import { io } from "socket.io-client";
+import {
+  FiBell,
+  FiLock,
+  FiPlus,
+  FiTrash2,
+  FiSave,
+  FiX,
+  FiEdit2,
+  FiMoreVertical,
+  FiArrowLeft,
+} from "react-icons/fi";
 
 const SOCKET_URL = import.meta.env.VITE_API_URL?.replace("/api/v1", "") || "http://localhost:5000";
 
@@ -42,6 +53,10 @@ export default function Chat() {
   const [paying, setPaying] = useState(false);
   const [payMsg, setPayMsg] = useState("");
   const [payDone, setPayDone] = useState(false);
+  const [onlineIds, setOnlineIds] = useState(() => new Set());
+  const [menuConvId, setMenuConvId] = useState(null);
+  const [editingId, setEditingId] = useState(null);
+  const [editText, setEditText] = useState("");
   const socketRef = useRef(null);
   const bottomRef = useRef(null);
 
@@ -212,12 +227,65 @@ export default function Chat() {
       }
     });
 
+    // Presence — who is currently online (for the green "Active" indicator)
+    socket.on("presence:list", ({ onlineUserIds }) => {
+      setOnlineIds(new Set(onlineUserIds || []));
+    });
+    socket.on("user:online", ({ userId }) => {
+      setOnlineIds((prev) => new Set(prev).add(userId));
+    });
+    socket.on("user:offline", ({ userId }) => {
+      setOnlineIds((prev) => {
+        const next = new Set(prev);
+        next.delete(userId);
+        return next;
+      });
+    });
+
+    // A message was edited by its author (or an admin)
+    socket.on("message:updated", ({ message }) => {
+      setMessages((prev) =>
+        prev.map((m) => (m._id === message._id ? { ...m, text: message.text, editedAt: message.editedAt } : m))
+      );
+    });
+
     return () => socket.disconnect();
   }, [activeId]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Close the conversation options (⋮) menu when clicking anywhere else
+  useEffect(() => {
+    if (!menuConvId) return;
+    const close = () => setMenuConvId(null);
+    document.addEventListener("click", close);
+    return () => document.removeEventListener("click", close);
+  }, [menuConvId]);
+
+  // ---- Message editing ----
+  const startEdit = (m) => {
+    setEditingId(m._id);
+    setEditText(m.text || "");
+  };
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditText("");
+  };
+  const saveEdit = async (messageId) => {
+    const nextText = editText.trim();
+    if (!nextText) return;
+    try {
+      await chatApi.updateMessage(messageId, nextText);
+      setMessages((prev) =>
+        prev.map((m) => (m._id === messageId ? { ...m, text: nextText, editedAt: new Date() } : m))
+      );
+      cancelEdit();
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const sendMessage = async (e) => {
     e.preventDefault();
@@ -351,7 +419,7 @@ export default function Chat() {
     try {
       const res = await groupsApi.addMembers(activeGroup._id, [userId]);
       const added = res.data?.addedCount ?? 0;
-      setMemberMsg(added > 0 ? `✅ ${name || "Member"} was added to ${activeGroup.name}` : "✅ Already a member of this group");
+      setMemberMsg(added > 0 ? `${name || "Member"} was added to ${activeGroup.name}` : "Already a member of this group");
       setMemberQuery("");
       setMemberResults([]);
       loadMembers(activeGroup._id); // refresh so the added member shows in the list below
@@ -364,6 +432,7 @@ export default function Chat() {
 
   const activeConv = conversations.find((c) => c._id === activeId);
   const otherParticipant = activeConv?.participants?.find((p) => p._id !== user?._id) || activeConv?.participants?.[0];
+  const isOtherOnline = Boolean(otherParticipant && onlineIds.has(otherParticipant._id));
 
   const grouped = messages.reduce((acc, msg, idx) => {
     const prev = messages[idx - 1];
@@ -379,8 +448,8 @@ export default function Chat() {
   return (
     <div className="max-w-6xl mx-auto mt-6">
       {toast && (
-        <div className="fixed top-20 right-4 z-50 bg-slate-900 border border-slate-700 shadow-lg rounded-xl px-4 py-3 text-sm text-white">
-          🔔 {toast}
+        <div className="fixed top-20 right-4 z-50 bg-slate-900 border border-slate-700 shadow-lg rounded-xl px-4 py-3 text-sm text-white flex items-center gap-2">
+          <FiBell className="shrink-0" /> {toast}
         </div>
       )}
 
@@ -388,7 +457,7 @@ export default function Chat() {
         <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl neo-modal max-w-md w-full p-6">
             <div className="w-12 h-12 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center text-2xl mb-3">
-              🔒
+              <FiLock />
             </div>
             <h3 className="text-xl font-bold text-brand mb-2">Join this group</h3>
             <p className="text-slate-600 mb-3">
@@ -423,7 +492,7 @@ export default function Chat() {
         <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl neo-modal max-w-md w-full p-6">
             <div className="w-12 h-12 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center text-2xl mb-3">
-              ➕
+              <FiPlus />
             </div>
             <h3 className="text-xl font-bold text-brand mb-1">Add member</h3>
             <p className="text-sm text-slate-500 mb-4">
@@ -530,22 +599,45 @@ export default function Chat() {
               >
                 <img src={other?.avatar || "https://via.placeholder.com/40"} alt="" className="w-10 h-10 rounded-full object-cover" />
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-slate-800 text-sm truncate">
-                    {c.type === "group" ? c.groupName : other?.fullname}
+                  <p className="font-medium text-slate-800 text-sm truncate flex items-center gap-1.5">
+                    <span className="truncate">{c.type === "group" ? c.groupName : other?.fullname}</span>
+                    {c.type !== "group" && other && (
+                      <span
+                        title={onlineIds.has(other._id) ? "Active now" : "Offline"}
+                        className={`h-2 w-2 rounded-full shrink-0 ${onlineIds.has(other._id) ? "bg-green-500 animate-pulse shadow-[0_0_6px_rgba(34,197,94,0.9)]" : "bg-slate-300"}`}
+                      />
+                    )}
                   </p>
                   <p className="text-xs text-slate-400 truncate">{c.lastMessage?.text || "No messages yet"}</p>
                 </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    removeConversation(c);
-                  }}
-                  title="Delete conversation"
-                  aria-label="Delete conversation"
-                  className="shrink-0 p-1 rounded opacity-0 group-hover/conv:opacity-100 focus:opacity-100 text-slate-900 hover:text-slate-600 font-bold transition"
-                >
-                  🗑
-                </button>
+                <div className="relative shrink-0">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setMenuConvId(menuConvId === c._id ? null : c._id);
+                    }}
+                    title="Conversation options"
+                    aria-label="Conversation options"
+                    aria-haspopup="menu"
+                    className="shrink-0 p-1 rounded opacity-0 group-hover/conv:opacity-100 focus:opacity-100 text-slate-900 hover:text-slate-600 transition"
+                  >
+                    <FiMoreVertical />
+                  </button>
+                  {menuConvId === c._id && (
+                    <div className="absolute right-0 z-30 mt-1 w-40 bg-white rounded-xl neo-menu border py-1 text-sm">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setMenuConvId(null);
+                          removeConversation(c);
+                        }}
+                        className="w-full flex items-center gap-2 text-left px-3 py-2 text-red-600 hover:bg-red-50"
+                      >
+                        <FiTrash2 /> Delete
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             );
           })}
@@ -559,9 +651,7 @@ export default function Chat() {
               className="md:hidden p-2 rounded-lg hover:bg-slate-100"
               aria-label="Back to list"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-slate-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
+              <FiArrowLeft className="h-5 w-5 text-slate-700" />
             </button>
             {otherParticipant && (
               <img src={otherParticipant.avatar || "https://via.placeholder.com/40"} alt="" className="w-9 h-9 rounded-full object-cover" />
@@ -574,8 +664,29 @@ export default function Chat() {
                   ? activeConv.groupName
                   : otherParticipant?.fullname
                 : "Select a conversation"}
-              {lockedGroup && <span className="ml-2 text-xs font-semibold text-slate-500">🔒 Not joined</span>}
+              {lockedGroup && (
+                <span className="ml-2 inline-flex items-center gap-1 text-xs font-semibold text-slate-500">
+                  <FiLock /> Not joined
+                </span>
+              )}
             </h2>
+            {activeConv && activeConv.type !== "group" && otherParticipant && (
+              <span
+                title={isOtherOnline ? "Active now" : "Offline"}
+                className={`inline-flex items-center gap-1.5 text-xs font-semibold ${
+                  isOtherOnline ? "text-green-600" : "text-slate-400"
+                }`}
+              >
+                <span
+                  className={`h-2.5 w-2.5 rounded-full ${
+                    isOtherOnline
+                      ? "bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.9)]"
+                      : "bg-slate-400"
+                  }`}
+                />
+                {isOtherOnline ? "Active" : "Offline"}
+              </span>
+            )}
             {activeGroup && user?.role === "admin" && (
               <button
                 onClick={() => setShowAddMember(true)}
@@ -600,31 +711,78 @@ export default function Chat() {
                       </div>
                     )}
                     <div className="space-y-1">
-                      {group.messages.map((m) => (
-                        <div key={m._id} className="group/msg flex items-center gap-1">
-                          <div
-                            className={`px-4 py-2 rounded-2xl transition ${
-                              highlighted.has(m._id)
-                                ? "ring-2 ring-accent bg-accent/10"
-                                : isMe
-                                ? "bg-brand text-white rounded-br-sm"
-                                : "bg-slate-100 text-slate-800 rounded-bl-sm"
-                            }`}
-                          >
-                            {m.text}
-                          </div>
-                          {(isMe || isAdmin) && (
+                      {group.messages.map((m) =>
+                        editingId === m._id ? (
+                          <div key={m._id} className="flex items-center gap-1">
+                            <input
+                              value={editText}
+                              onChange={(e) => setEditText(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  saveEdit(m._id);
+                                }
+                                if (e.key === "Escape") cancelEdit();
+                              }}
+                              autoFocus
+                              className="px-3 py-2 rounded-2xl border border-slate-300 bg-white text-sm text-slate-800 focus:ring-2 focus:ring-brand w-64 max-w-[60vw]"
+                            />
                             <button
-                              onClick={() => removeMessage(m._id)}
-                              title="Delete message"
-                              aria-label="Delete message"
-                              className="shrink-0 px-1 opacity-0 group-hover/msg:opacity-100 focus:opacity-100 text-[11px] text-slate-900 hover:text-slate-600 font-bold transition"
+                              onClick={() => saveEdit(m._id)}
+                              title="Save edit"
+                              aria-label="Save edit"
+                              className="shrink-0 p-1 text-slate-900 hover:text-slate-600 transition"
                             >
-                              🗑
+                              <FiSave size={15} />
                             </button>
-                          )}
-                        </div>
-                      ))}
+                            <button
+                              onClick={cancelEdit}
+                              title="Cancel edit"
+                              aria-label="Cancel edit"
+                              className="shrink-0 p-1 text-slate-500 hover:text-slate-700 transition"
+                            >
+                              <FiX size={15} />
+                            </button>
+                          </div>
+                        ) : (
+                          <div key={m._id} className="group/msg flex items-center gap-1">
+                            <div
+                              className={`px-4 py-2 rounded-2xl transition ${
+                                highlighted.has(m._id)
+                                  ? "ring-2 ring-accent bg-accent/10"
+                                  : isMe
+                                  ? "bg-brand text-white rounded-br-sm"
+                                  : "bg-slate-100 text-slate-800 rounded-bl-sm"
+                              }`}
+                            >
+                              {m.text}
+                              {m.editedAt && (
+                                <span className="ml-1.5 text-[10px] opacity-70 align-middle">(edited)</span>
+                              )}
+                            </div>
+                            {isMe && (
+                              <button
+                                onClick={() => startEdit(m)}
+                                title="Edit message"
+                                aria-label="Edit message"
+                                className="shrink-0 p-1 opacity-0 group-hover/msg:opacity-100 focus:opacity-100 text-slate-900 hover:text-slate-600 transition"
+                              >
+                                <FiEdit2 size={14} />
+                              </button>
+                            )}
+                            {(isMe || isAdmin) && (
+                              <button
+                                onClick={() => removeMessage(m._id)}
+                                title="Delete message"
+                                aria-label="Delete message"
+                                className="shrink-0 p-1 opacity-0 group-hover/msg:opacity-100 focus:opacity-100 text-slate-900 hover:text-slate-600 transition"
+                              >
+                                <FiTrash2 size={14} />
+                              </button>
+                            )}
+                          </div>
+                        )
+                      )}
                     </div>
                   </div>
                 </div>

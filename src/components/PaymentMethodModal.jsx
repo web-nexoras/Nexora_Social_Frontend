@@ -1,4 +1,5 @@
 import React from "react";
+import { FiCreditCard } from "react-icons/fi";
 
 // Brand icon snippets (inline SVG so they always render, no network needed)
 const ICONS = {
@@ -54,7 +55,7 @@ export default function PaymentMethodModal({ group, selected, onSelect, onConfir
     <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl neo-modal max-w-md w-full p-6">
         <div className="w-12 h-12 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center text-2xl mb-3">
-          💳
+          <FiCreditCard />
         </div>
         <h3 className="text-xl font-bold text-brand mb-1">Choose payment method</h3>
         <p className="text-sm text-slate-500 mb-4">

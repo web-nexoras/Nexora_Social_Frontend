@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { FiArrowLeft } from "react-icons/fi";
 import { useParams, useSearchParams, useNavigate, Link } from "react-router-dom";
 import { authApi } from "../api/authApi";
 import AuthShell from "../components/AuthShell";
@@ -41,8 +42,8 @@ export default function ResetPassword() {
       title="Reset Password"
       subtitle="Set a new password for your Nexora Social account."
       footer={
-        <Link to="/login" className="text-brand font-semibold hover:underline">
-          ← Back to Sign In
+        <Link to="/login" className="inline-flex items-center gap-1 text-brand font-semibold hover:underline">
+          <FiArrowLeft /> Back to Sign In
         </Link>
       }
     >

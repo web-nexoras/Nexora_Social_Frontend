@@ -2,6 +2,18 @@ import React from "react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
+import {
+  FiHome,
+  FiUser,
+  FiUsers,
+  FiMessageSquare,
+  FiTag,
+  FiCreditCard,
+  FiShield,
+  FiSettings,
+  FiSun,
+  FiMoon,
+} from "react-icons/fi";
 
 const linkClass = ({ isActive }) =>
   `flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition ${
@@ -24,31 +36,31 @@ export default function Sidebar({ onNavigate }) {
       </div>
       <nav className="space-y-2 lg:space">
         <NavLink to="/dashboard" className={linkClass}>
-          🏠 Overview
+          <FiHome className="shrink-0" /> Overview
         </NavLink>
         <NavLink to="/profile" className={linkClass}>
-          👤 Profile
+          <FiUser className="shrink-0" /> Profile
         </NavLink>
         <NavLink to="/friends" className={linkClass}>
-          👥 Friends
+          <FiUsers className="shrink-0" /> Friends
         </NavLink>
         <NavLink to="/chat" className={linkClass}>
-          💬 Messages
+          <FiMessageSquare className="shrink-0" /> Messages
         </NavLink>
         <NavLink to="/groups" className={linkClass}>
-          🏷️ Groups
+          <FiTag className="shrink-0" /> Groups
         </NavLink>
         <NavLink to="/payments" className={linkClass}>
-          💳 Payments
+          <FiCreditCard className="shrink-0" /> Payments
         </NavLink>
         {user?.role === "admin" && (
           <>
             <div className="my-3 border-t" />
             <NavLink to="/admin/users" className={linkClass}>
-              🛡️ All Users
+              <FiShield className="shrink-0" /> All Users
             </NavLink>
             <NavLink to="/admin/groups" className={linkClass}>
-              ⚙️ Admin Groups
+              <FiSettings className="shrink-0" /> Admin Groups
             </NavLink>
           </>
         )}
@@ -64,7 +76,7 @@ export default function Sidebar({ onNavigate }) {
               theme === "light" ? "bg-brand text-white shadow" : "text-slate-700 hover:bg-indigo-50 hover:text-brand"
             }`}
           >
-            ☀️ Light
+            <FiSun /> Light
           </button>
           <button
             onClick={() => setTheme("dark")}
@@ -72,11 +84,10 @@ export default function Sidebar({ onNavigate }) {
               theme === "dark" ? "bg-brand text-white shadow" : "text-slate-700 hover:bg-indigo-50 hover:text-brand"
             }`}
           >
-            🌙 Dark
+            <FiMoon /> Dark
           </button>
         </div>
       </div>
     </aside>
   );
 }
-
