@@ -17,20 +17,20 @@ export default function VerifyOtp() {
   const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(false);
   const [devOtp, setDevOtp] = useState(location.state?.devOtp || "");
+  // Per-field errors: shown only on submit, only under the field that's wrong
+  const [fieldErrors, setFieldErrors] = useState({ email: "", otp: "" });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setMsg("");
 
-    if (!email.trim()) {
-      setError("Email is required");
-      return;
-    }
-    if (!otp.trim() || otp.trim().length !== 6) {
-      setError("Please enter the complete 6-digit OTP code");
-      return;
-    }
+    const errs = { email: "", otp: "" };
+    if (!email.trim()) errs.email = "Email is required";
+    if (!otp.trim()) errs.otp = "OTP code is required";
+    else if (otp.trim().length !== 6) errs.otp = "Please enter the complete 6-digit OTP code";
+    setFieldErrors(errs);
+    if (errs.email || errs.otp) return;
 
     setLoading(true);
     try {
@@ -50,7 +50,7 @@ export default function VerifyOtp() {
     setError("");
     setMsg("");
     if (!email.trim()) {
-      setError("Please enter your email to resend OTP");
+      setFieldErrors((p) => ({ ...p, email: "Email is required" }));
       return;
     }
     try {
@@ -110,26 +110,44 @@ export default function VerifyOtp() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          autoComplete="email"
-          className="w-full neo-input rounded-xl px-4 py-3 text-slate-700 text-sm"
-          required
-        />
-        <input
-          type="text"
-          inputMode="numeric"
-          maxLength={6}
-          placeholder="OTP (6 digits)"
-          value={otp}
-          onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
-          className="w-full neo-input rounded-xl px-4 py-3 text-slate-700 text-sm tracking-widest text-center font-mono font-semibold"
-          required
-        />
+      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+        <div className="space-y-1">
+          {fieldErrors.email && (
+            <p className="mb-px px-1 text-rose-700 text-xs font-bold">{fieldErrors.email}</p>
+          )}
+          <input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              if (fieldErrors.email) setFieldErrors((p) => ({ ...p, email: "" }));
+            }}
+            autoComplete="email"
+            className={`w-full neo-input rounded-xl px-4 py-3 text-slate-700 text-sm transition ${
+              fieldErrors.email ? "border-rose-500 bg-rose-50/20 ring-1 ring-rose-400" : ""
+            }`}
+          />
+        </div>
+        <div className="space-y-1">
+          {fieldErrors.otp && (
+            <p className="mb-px px-1 text-rose-700 text-xs font-bold">{fieldErrors.otp}</p>
+          )}
+          <input
+            type="text"
+            inputMode="numeric"
+            maxLength={6}
+            placeholder="OTP (6 digits)"
+            value={otp}
+            onChange={(e) => {
+              setOtp(e.target.value.replace(/\D/g, ""));
+              if (fieldErrors.otp) setFieldErrors((p) => ({ ...p, otp: "" }));
+            }}
+            className={`w-full neo-input rounded-xl px-4 py-3 text-slate-700 text-sm tracking-widest text-center font-mono font-semibold transition ${
+              fieldErrors.otp ? "border-rose-500 bg-rose-50/20 ring-1 ring-rose-400" : ""
+            }`}
+          />
+        </div>
         <button
           type="submit"
           disabled={loading}

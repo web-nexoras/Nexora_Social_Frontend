@@ -16,15 +16,23 @@ export default function ResetPassword() {
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  // Per-field errors: shown only on submit, only under the offending field
+  const [fieldErrors, setFieldErrors] = useState({ email: "", token: "", password: "" });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMsg("");
     setError("");
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters long");
-      return;
-    }
+
+    const errs = { email: "", token: "", password: "" };
+    if (!email.trim()) errs.email = "Email is required";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
+      errs.email = "Please enter a valid email address";
+    if (!tokenParam && !token.trim()) errs.token = "Reset token is required";
+    if (password.length < 8) errs.password = "Password must be at least 8 characters long";
+    setFieldErrors(errs);
+    if (errs.email || errs.token || errs.password) return;
+
     setLoading(true);
     try {
       const res = await authApi.resetPassword(token, email, password);
@@ -50,32 +58,54 @@ export default function ResetPassword() {
       {msg && <p className="text-emerald-600 text-sm mb-4 text-center bg-emerald-50 rounded-xl py-2 px-3">{msg}</p>}
       {error && <p className="text-red-500 text-sm mb-4 text-center bg-red-50 rounded-xl py-2 px-3">{error}</p>}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          autoComplete="email"
-          className="w-full neo-input rounded-xl px-4 py-3 text-slate-700 text-sm"
-          required
-        />
+      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+        <div className="space-y-1">
+          {fieldErrors.email && (
+            <p className="mb-px px-1 text-rose-700 text-xs font-bold">{fieldErrors.email}</p>
+          )}
+          <input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              if (fieldErrors.email) setFieldErrors((p) => ({ ...p, email: "" }));
+            }}
+            autoComplete="email"
+            className={`w-full neo-input rounded-xl px-4 py-3 text-slate-700 text-sm transition ${
+              fieldErrors.email ? "border-rose-500 bg-rose-50/20 ring-1 ring-rose-400" : ""
+            }`}
+          />
+        </div>
 
         {!tokenParam && (
-          <input
-            placeholder="Reset token (from your email)"
-            value={token}
-            onChange={(e) => setToken(e.target.value)}
-            className="w-full neo-input rounded-xl px-4 py-3 text-slate-700 text-sm"
-            required
-          />
+          <div className="space-y-1">
+            {fieldErrors.token && (
+              <p className="mb-px px-1 text-rose-700 text-xs font-bold">{fieldErrors.token}</p>
+            )}
+            <input
+              placeholder="Reset token (from your email)"
+              value={token}
+              onChange={(e) => {
+                setToken(e.target.value);
+                if (fieldErrors.token) setFieldErrors((p) => ({ ...p, token: "" }));
+              }}
+              className={`w-full neo-input rounded-xl px-4 py-3 text-slate-700 text-sm transition ${
+                fieldErrors.token ? "border-rose-500 bg-rose-50/20 ring-1 ring-rose-400" : ""
+              }`}
+            />
+          </div>
         )}
 
         <PasswordInput
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          onChange={(e) => {
+            setPassword(e.target.value);
+            if (fieldErrors.password) setFieldErrors((p) => ({ ...p, password: "" }));
+          }}
           placeholder="New password (min 8)"
           autoComplete="new-password"
+          error={fieldErrors.password}
         />
 
         <button

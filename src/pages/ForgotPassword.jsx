@@ -10,12 +10,24 @@ export default function ForgotPassword() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [devLink, setDevLink] = useState("");
+  // Per-field error: shown only on submit, only under the offending field
+  const [fieldError, setFieldError] = useState("");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMsg("");
     setError("");
     setDevLink("");
+
+    if (!email.trim()) {
+      setFieldError("Email is required");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setFieldError("Please enter a valid email address");
+      return;
+    }
+    setFieldError("");
     setLoading(true);
     try {
       const res = await authApi.forgotPassword(email);
@@ -51,16 +63,25 @@ export default function ForgotPassword() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          autoComplete="email"
-          className="w-full neo-input rounded-xl px-4 py-3 text-slate-700 text-sm"
-          required
-        />
+      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+        <div className="space-y-1">
+          {fieldError && (
+            <p className="mb-px px-1 text-rose-700 text-xs font-bold">{fieldError}</p>
+          )}
+          <input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              if (fieldError) setFieldError("");
+            }}
+            autoComplete="email"
+            className={`w-full neo-input rounded-xl px-4 py-3 text-slate-700 text-sm transition ${
+              fieldError ? "border-rose-500 bg-rose-50/20 ring-1 ring-rose-400" : ""
+            }`}
+          />
+        </div>
         <button
           type="submit"
           disabled={loading}
