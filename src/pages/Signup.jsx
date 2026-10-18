@@ -135,7 +135,7 @@ export default function Signup() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full py-3 rounded-xl bg-gradient-to-r from-brand to-indigo-600 text-white text-sm font-semibold neo-btn disabled:opacity-60 transition shadow-md hover:shadow-lg"
+          className="w-full py-3 rounded-xl bg-gradient-to-r from-brand to-indigo-600 text-black text-sm font-semibold neo-btn disabled:opacity-60 transition shadow-md hover:shadow-lg"
         >
           {loading ? "Signing up..." : "Sign Up"}
         </button>
