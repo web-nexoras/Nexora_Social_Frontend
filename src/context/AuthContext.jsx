@@ -15,6 +15,7 @@ export function AuthProvider({ children }) {
         setUser(res.data?.user || res.data);
       } catch (error) {
         setUser(null);
+        localStorage.removeItem("accTkn");
       } finally {
         setLoading(false);
       }
@@ -24,8 +25,15 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     const res = await authApi.signin(email, password);
-    const me = await authApi.getProfile();
-    setUser(me.data?.user || me.data);
+    if (res.data?.accessToken) {
+      localStorage.setItem("accTkn", res.data.accessToken);
+    }
+    if (res.data?.user) {
+      setUser(res.data.user);
+    } else {
+      const me = await authApi.getProfile();
+      setUser(me.data?.user || me.data);
+    }
     return res.data;
   };
 
@@ -40,8 +48,12 @@ export function AuthProvider({ children }) {
   };
 
   const logout = async () => {
-    await authApi.signout();
-    setUser(null);
+    try {
+      await authApi.signout();
+    } finally {
+      localStorage.removeItem("accTkn");
+      setUser(null);
+    }
   };
 
   const updateProfile = async (formData) => {
