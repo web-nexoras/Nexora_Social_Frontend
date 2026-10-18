@@ -81,8 +81,8 @@ export default function Profile() {
         {/* Profile Content */}
         <div className="px-6 sm:px-8 pb-8">
           <div className="-mt-14 mb-6">
-            {/* Avatar container with photo upload overlay */}
-            <div className="relative w-28 h-28 rounded-full border-4 border-white shadow-2xl overflow-hidden bg-slate-900 shrink-0 group">
+            {/* Avatar container with photo upload overlay — z-10 so it paints over the banner */}
+            <div className="relative z-10 w-28 h-28 rounded-full border-4 border-white shadow-2xl overflow-hidden bg-slate-900 shrink-0 group">
               {preview && !imgError ? (
                 <img
                   src={preview}

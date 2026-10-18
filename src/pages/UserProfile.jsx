@@ -94,8 +94,8 @@ export default function UserProfile() {
         {/* Card Content */}
         <div className="px-6 sm:px-8 pb-8">
           <div className="-mt-14 mb-6">
-            {/* Avatar with fallback to clean initials */}
-            <div className="w-28 h-28 rounded-full border-4 border-white shadow-2xl overflow-hidden bg-slate-900 shrink-0">
+            {/* Avatar with fallback to clean initials — z-10 so it paints over the banner */}
+            <div className="relative z-10 w-28 h-28 rounded-full border-4 border-white shadow-2xl overflow-hidden bg-slate-900 shrink-0">
               {user.avatar && !imgError ? (
                 <img
                   src={user.avatar}
