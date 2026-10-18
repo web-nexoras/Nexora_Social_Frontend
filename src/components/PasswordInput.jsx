@@ -15,6 +15,7 @@ export default function PasswordInput({
 
   return (
     <div className="space-y-1">
+      {error && <p className="mb-px px-1 text-rose-700 text-xs font-bold">{error}</p>}
       <div className="relative">
         <input
           type={show ? "text" : "password"}
@@ -38,7 +39,6 @@ export default function PasswordInput({
           {show ? <FiEyeOff className="h-5 w-5" /> : <FiEye className="h-5 w-5" />}
         </button>
       </div>
-      {error && <p className="text-rose-500 text-xs px-1 font-medium">{error}</p>}
     </div>
   );
 }

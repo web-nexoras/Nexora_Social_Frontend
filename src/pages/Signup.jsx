@@ -89,6 +89,9 @@ export default function Signup() {
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
         {/* Full Name */}
         <div className="space-y-1">
+          {fieldErrors.fullname && (
+            <p className="mb-px px-1 text-rose-700 text-xs font-bold">{fieldErrors.fullname}</p>
+          )}
           <input
             name="fullname"
             placeholder="Full Name"
@@ -99,13 +102,13 @@ export default function Signup() {
               fieldErrors.fullname ? "border-rose-500 bg-rose-50/20 ring-1 ring-rose-400" : ""
             }`}
           />
-          {fieldErrors.fullname && (
-            <p className="text-rose-500 text-xs px-1 font-medium">{fieldErrors.fullname}</p>
-          )}
         </div>
 
         {/* Email */}
         <div className="space-y-1">
+          {fieldErrors.email && (
+            <p className="mb-px px-1 text-rose-700 text-xs font-bold">{fieldErrors.email}</p>
+          )}
           <input
             name="email"
             type="email"
@@ -117,9 +120,6 @@ export default function Signup() {
               fieldErrors.email ? "border-rose-500 bg-rose-50/20 ring-1 ring-rose-400" : ""
             }`}
           />
-          {fieldErrors.email && (
-            <p className="text-rose-500 text-xs px-1 font-medium">{fieldErrors.email}</p>
-          )}
         </div>
 
         {/* Password */}

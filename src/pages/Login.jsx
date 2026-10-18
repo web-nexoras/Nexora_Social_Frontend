@@ -90,6 +90,9 @@ export default function Login() {
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
         {/* Email */}
         <div className="space-y-1">
+          {fieldErrors.email && (
+            <p className="mb-px px-1 text-rose-700 text-xs font-bold">{fieldErrors.email}</p>
+          )}
           <input
             type="email"
             placeholder="Email"
@@ -104,9 +107,6 @@ export default function Login() {
               fieldErrors.email ? "border-rose-500 bg-rose-50/20 ring-1 ring-rose-400" : ""
             }`}
           />
-          {fieldErrors.email && (
-            <p className="text-rose-500 text-xs px-1 font-medium">{fieldErrors.email}</p>
-          )}
         </div>
 
         {/* Password */}
