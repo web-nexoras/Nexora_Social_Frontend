@@ -43,7 +43,8 @@ export default function UserProfile() {
   };
 
   if (loading) return <p className="text-center mt-10">Loading...</p>;
-  if (!user) return <p className="text-center mt-10 text-slate-500">User not found</p>;
+  if (!user)
+    return <p className="text-center mt-10 text-slate-500">User not found</p>;
 
   const rel = relationship || {};
   const canMessage = rel.isFriend || user.role === "admin" || isSelf;
@@ -61,7 +62,9 @@ export default function UserProfile() {
               className="w-24 h-24 rounded-full border-4 border-white object-cover bg-slate-200 shadow-lg"
             />
             <div className="pb-2">
-              <h1 className="text-2xl font-bold text-slate-800">{user.fullname}</h1>
+              <h1 className="text-2xl font-bold text-slate-800">
+                {user.fullname}
+              </h1>
               <p className="text-sm text-slate-400">{user.email}</p>
             </div>
           </div>
@@ -69,11 +72,15 @@ export default function UserProfile() {
           <div className="mt-5 grid sm:grid-cols-2 gap-4 text-sm">
             <div className="bg-slate-50 rounded-xl p-4">
               <p className="text-slate-400 text-xs mb-1">Role</p>
-              <p className="font-medium text-slate-700 capitalize">{user.role}</p>
+              <p className="font-medium text-slate-700 capitalize">
+                {user.role}
+              </p>
             </div>
             <div className="bg-slate-50 rounded-xl p-4">
               <p className="text-slate-400 text-xs mb-1">Address</p>
-              <p className="font-medium text-slate-700">{user.address || "—"}</p>
+              <p className="font-medium text-slate-700">
+                {user.address || "—"}
+              </p>
             </div>
           </div>
 
@@ -81,7 +88,10 @@ export default function UserProfile() {
 
           <div className="flex flex-wrap gap-3 mt-6">
             {isSelf && (
-              <Link to="/profile" className="px-4 py-2 rounded-lg bg-brand text-white font-semibold hover:bg-indigo-700 transition">
+              <Link
+                to="/profile"
+                className="px-4 py-2 rounded-lg bg-brand text-white font-semibold hover:bg-indigo-700 transition"
+              >
                 Edit Profile
               </Link>
             )}
@@ -93,28 +103,45 @@ export default function UserProfile() {
             )}
 
             {!isSelf && !rel.isFriend && rel.requestSent && (
-              <span className="px-4 py-2 rounded-lg bg-slate-100 text-slate-500 font-semibold">Request Sent</span>
+              <span className="px-4 py-2 rounded-lg bg-slate-100 text-slate-500 font-semibold">
+                Request Sent
+              </span>
             )}
 
             {!isSelf && !rel.isFriend && rel.requestReceived && (
-              <Link to="/friends" className="px-4 py-2 rounded-lg bg-cyan-500 text-white font-semibold hover:bg-cyan-600 transition">
+              <Link
+                to="/friends"
+                className="px-4 py-2 rounded-lg bg-cyan-500 text-white font-semibold hover:bg-cyan-600 transition"
+              >
                 Respond to Request
               </Link>
             )}
 
-            {!isSelf && !rel.isFriend && !rel.requestSent && !rel.requestReceived && (
-              <button onClick={addFriend} className="px-4 py-2 rounded-lg bg-brand text-white font-semibold hover:bg-indigo-700 transition">
-                Add Friend
-              </button>
-            )}
+            {!isSelf &&
+              !rel.isFriend &&
+              !rel.requestSent &&
+              !rel.requestReceived && (
+                <button
+                  onClick={addFriend}
+                  className="px-4 py-2 rounded-lg bg-brand text-white font-semibold hover:bg-indigo-700 transition"
+                >
+                  Add Friend
+                </button>
+              )}
 
             {canMessage && (
-              <Link to={`/chat?user=${user._id}`} className="px-4 py-2 rounded-lg bg-slate-800 text-white font-semibold hover:bg-slate-900 transition">
+              <Link
+                to={`/chat?user=${user._id}`}
+                className="px-4 py-2 rounded-lg bg-slate-800 text-white font-semibold hover:bg-slate-900 transition"
+              >
                 Message
               </Link>
             )}
 
-            <button onClick={() => navigate(-1)} className="px-4 py-2 rounded-lg bg-slate-200 text-slate-700 font-semibold hover:bg-slate-300 transition">
+            <button
+              onClick={() => navigate(-1)}
+              className="px-4 py-2 rounded-lg bg-slate-200 text-slate-700 font-semibold hover:bg-slate-300 transition"
+            >
               Back
             </button>
           </div>
