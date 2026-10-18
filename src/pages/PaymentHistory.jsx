@@ -1,20 +1,37 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { paymentsApi } from "../api/groupsApi";
 import { useAuth } from "../context/AuthContext";
-import { FiCheck, FiX, FiUsers } from "react-icons/fi";
+import { FiCheck, FiX, FiUsers, FiClock, FiCreditCard, FiTrash2 } from "react-icons/fi";
 
 const fmtDate = (d) => (d ? new Date(d).toLocaleDateString() : "—");
 
+const daysLeft = (d) => {
+  if (!d) return null;
+  const ms = new Date(d).getTime() - Date.now();
+  return Math.ceil(ms / 86400000);
+};
+
 const statusStyles = {
   active: "bg-green-100 text-green-700",
-  pending: "bg-slate-200 text-slate-600",
+  pending: "bg-amber-100 text-amber-700",
   failed: "bg-red-100 text-red-700",
   cancelled: "bg-slate-200 text-slate-600",
   expired: "bg-red-100 text-red-700",
 };
 
-function SubscriberCard({ s }) {
-  const cls = statusStyles[s.status] || "bg-slate-200 text-slate-600";
+function StatusBadge({ status }) {
+  const cls = statusStyles[status] || "bg-slate-200 text-slate-600";
+  return (
+    <span className={`shrink-0 px-2.5 py-0.5 rounded-full text-xs font-semibold capitalize ${cls}`}>
+      {status}
+    </span>
+  );
+}
+
+// Admin card: who subscribed, how much, and when the 6-month access ends.
+function SubscriberCard({ s, onAction, busy }) {
+  const active = s.status === "active";
+  const expired = !!s.isExpired;
   return (
     <div className="bg-white rounded-2xl shadow p-5">
       <div className="flex items-start gap-4">
@@ -26,9 +43,7 @@ function SubscriberCard({ s }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
             <h3 className="font-bold text-slate-800 truncate">{s.user?.fullname || "Unknown user"}</h3>
-            <span className={`shrink-0 px-2.5 py-0.5 rounded-full text-xs font-semibold capitalize ${cls}`}>
-              {s.status}
-            </span>
+            <StatusBadge status={s.status} />
           </div>
           <p className="text-sm text-slate-500 truncate">{s.user?.email || "—"}</p>
 
@@ -47,14 +62,91 @@ function SubscriberCard({ s }) {
               <p className="text-xs text-slate-400">Paid on</p>
               <p className="font-medium text-slate-700">{fmtDate(s.paidAt || s.createdAt)}</p>
             </div>
-            <div>
-              <p className="text-xs text-slate-400">Expires (6 months)</p>
-              <p className={`font-medium ${s.isExpired ? "text-red-500" : "text-green-600"}`}>
-                {fmtDate(s.expiresAt)}
-              </p>
-            </div>
+            {active && (
+              <div>
+                <p className="text-xs text-slate-400">Expires (6 months)</p>
+                <p className={`font-medium ${expired ? "text-red-500" : "text-green-600"}`}>
+                  {fmtDate(s.expiresAt)}
+                </p>
+              </div>
+            )}
           </div>
+
+          {s.status === "pending" && (
+            <div className="mt-4 flex items-center gap-2">
+              <button
+                onClick={() => onAction(s._id, "approve")}
+                disabled={busy}
+                className="inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg bg-brand text-white text-xs font-semibold hover:bg-slate-700 transition disabled:opacity-60"
+              >
+                <FiCheck /> Approve
+              </button>
+              <button
+                onClick={() => onAction(s._id, "reject")}
+                disabled={busy}
+                className="inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg bg-red-50 text-red-600 text-xs font-semibold hover:bg-red-100 transition disabled:opacity-60"
+              >
+                <FiX /> Reject
+              </button>
+            </div>
+          )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// Subscriber's own card: shows the expiry date up front so nobody has to ask.
+function MySubscriptionCard({ s, onAction, busy }) {
+  const active = s.status === "active";
+  const rejectedByAdmin = s.status === "cancelled" && s.cancelledBy === "admin";
+  const left = daysLeft(s.expiresAt);
+  return (
+    <div className="bg-white rounded-2xl shadow p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="text-lg font-bold text-slate-800 truncate">{s.group?.name}</h3>
+          <p className="text-sm text-slate-500 truncate">{s.group?.description}</p>
+        </div>
+        <StatusBadge status={s.status} />
+      </div>
+
+      {/* Admin rejected this request — subscriber decides when to clear it */}
+      {rejectedByAdmin && (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-red-50 px-3.5 py-3">
+          <p className="text-sm font-semibold text-red-600">Your subscription was cancelled by admin</p>
+          <button
+            onClick={() => onAction(s._id, "removeMine")}
+            disabled={busy}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-red-200 text-red-600 text-xs font-bold hover:bg-red-100 transition disabled:opacity-60"
+          >
+            <FiTrash2 /> Remove
+          </button>
+        </div>
+      )}
+
+      <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+        <div>
+          <p className="text-xs text-slate-400">Amount</p>
+          <p className="font-medium text-slate-700">
+            {s.amount} {s.currency}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs text-slate-400">Paid on</p>
+          <p className="font-medium text-slate-700">{fmtDate(s.paidAt || s.createdAt)}</p>
+        </div>
+        {active && (
+          <div className="col-span-2">
+            <p className="text-xs text-slate-400">Expires (6 months)</p>
+            <p className="text-base font-bold text-green-600">{fmtDate(s.expiresAt)}</p>
+            {left !== null && (
+              <p className="inline-flex items-center gap-1 text-xs text-slate-400 mt-0.5">
+                <FiClock /> {left > 0 ? `${left} days left` : "expired"}
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -67,40 +159,86 @@ export default function PaymentHistory() {
   const [allSubs, setAllSubs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [allLoading, setAllLoading] = useState(false);
+  const [busyId, setBusyId] = useState(null);
+
+  const loadMy = async () => {
+    try {
+      const res = await paymentsApi.mySubscriptions();
+      setSubs(res.data.subscriptions || []);
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      try {
-        const res = await paymentsApi.mySubscriptions();
-        setSubs(res.data.subscriptions || []);
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
+    setLoading(true);
+    loadMy().finally(() => setLoading(false));
   }, []);
 
   // Admin only: full subscriber list across every group
+  const loadAll = async () => {
+    try {
+      const res = await paymentsApi.adminAll();
+      setAllSubs(res.data.subscriptions || []);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   useEffect(() => {
     if (!isAdmin) return;
-    const loadAll = async () => {
-      setAllLoading(true);
-      try {
-        const res = await paymentsApi.adminAll();
-        setAllSubs(res.data.subscriptions || []);
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setAllLoading(false);
-      }
-    };
-    loadAll();
+    setAllLoading(true);
+    loadAll().finally(() => setAllLoading(false));
   }, [isAdmin]);
 
-  const activeCount = allSubs.filter((s) => s.status === "active" && !s.isExpired).length;
+  const handleAction = async (id, action) => {
+    if (action === "reject") {
+      if (!window.confirm("Reject this payment request? It will leave the admin list and the subscriber will see \"cancelled by admin\".")) return;
+    }
+    if (action === "removeMine") {
+      if (!window.confirm("Remove this subscription record from your list?")) return;
+    }
+    setBusyId(id);
+    try {
+      if (action === "approve") await paymentsApi.approve(id);
+      else if (action === "reject") await paymentsApi.reject(id);
+      else if (action === "removeMine") await paymentsApi.removeMy(id);
+      await loadAll();
+      await loadMy();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  // One card per person: keep the record that matters most.
+  // A pending payment request wins (so Approve/Reject always stays reachable),
+  // then an active subscription, then anything else. Newest wins ties.
+  const dedupedSubs = useMemo(() => {
+    const rank = (s) => {
+      if (s.status === "pending") return 3;
+      if (s.status === "active" && !s.isExpired) return 2;
+      if (s.status === "active") return 1;
+      return 0;
+    };
+    const best = new Map();
+    for (const s of allSubs) {
+      const key = s.user?._id || String(s.user);
+      const prev = best.get(key);
+      if (
+        !prev ||
+        rank(s) > rank(prev) ||
+        (rank(s) === rank(prev) && new Date(s.createdAt) > new Date(prev.createdAt))
+      ) {
+        best.set(key, s);
+      }
+    }
+    return Array.from(best.values());
+  }, [allSubs]);
+
+  const activeCount = dedupedSubs.filter((s) => s.status === "active" && !s.isExpired).length;
+  const pendingCount = dedupedSubs.filter((s) => s.status === "pending").length;
 
   if (loading) return <p className="text-center mt-10">Loading...</p>;
 
@@ -109,26 +247,9 @@ export default function PaymentHistory() {
       <section>
         <h1 className="text-3xl font-bold text-brand mb-6">My Subscriptions</h1>
         {subs.length === 0 && <p className="text-slate-500">No subscriptions yet.</p>}
-        <div className="space-y-4">
+        <div className="grid gap-4 md:grid-cols-2">
           {subs.map((s) => (
-            <div key={s._id} className="bg-white rounded-2xl shadow p-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-bold text-slate-800">{s.group?.name}</h3>
-                  <p className="text-sm text-slate-500">{s.group?.description}</p>
-                  <p className="text-sm mt-1">Amount: {s.amount} {s.currency}</p>
-                  <p className="text-sm">Status: <span className="font-semibold capitalize">{s.status}</span></p>
-                  {s.expiresAt && <p className="text-sm">Expires: {fmtDate(s.expiresAt)}</p>}
-                </div>
-                <span
-                  className={`px-3 py-1 rounded-full text-xs font-semibold capitalize ${
-                    s.status === "active" ? "bg-slate-700 text-white" : "bg-slate-100 text-slate-600"
-                  }`}
-                >
-                  {s.status}
-                </span>
-              </div>
-            </div>
+            <MySubscriptionCard key={s._id} s={s} onAction={handleAction} busy={busyId === s._id} />
           ))}
         </div>
       </section>
@@ -136,22 +257,42 @@ export default function PaymentHistory() {
       {/* Admin: everyone who has subscribed */}
       {isAdmin && (
         <section>
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
             <h2 className="text-2xl font-bold text-brand">All Subscribers</h2>
-            <span className="inline-flex items-center gap-2 text-sm text-slate-500">
-              <FiUsers />
-              {allSubs.length} total · <FiCheck className="text-green-600" /> {activeCount} active
-            </span>
+
+            {/* Card-style summary pills */}
+            <div className="flex items-center gap-3">
+              <span className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl neo-raised-sm text-sm font-bold text-slate-700">
+                <FiUsers className="text-slate-500" />
+                {dedupedSubs.length}
+                <span className="text-slate-400 font-medium">Total</span>
+              </span>
+              <span className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl neo-raised-sm text-sm font-bold text-green-700">
+                <FiCheck className="text-green-600" />
+                {activeCount}
+                <span className="text-green-600/70 font-medium">Active</span>
+              </span>
+              <span className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl neo-raised-sm text-sm font-bold text-amber-700">
+                <FiCreditCard className="text-amber-600" />
+                {pendingCount}
+                <span className="text-amber-600/70 font-medium">Pending</span>
+              </span>
+            </div>
           </div>
 
           {allLoading && <p className="text-slate-400">Loading subscribers...</p>}
-          {!allLoading && allSubs.length === 0 && (
+          {!allLoading && dedupedSubs.length === 0 && (
             <p className="text-slate-500">No subscribers yet.</p>
           )}
 
           <div className="grid gap-4 md:grid-cols-2">
-            {allSubs.map((s) => (
-              <SubscriberCard key={s._id} s={s} />
+            {dedupedSubs.map((s) => (
+              <SubscriberCard
+                key={s._id}
+                s={s}
+                onAction={handleAction}
+                busy={busyId === s._id}
+              />
             ))}
           </div>
         </section>
