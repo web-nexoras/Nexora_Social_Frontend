@@ -58,6 +58,7 @@ export default function Chat() {
   const [editingId, setEditingId] = useState(null);
   const [editText, setEditText] = useState("");
   const socketRef = useRef(null);
+  const activeIdRef = useRef(null);
   const bottomRef = useRef(null);
 
   const playNotificationSound = () => {
@@ -176,6 +177,13 @@ export default function Chat() {
     if (showAddMember && activeGroup) loadMembers(activeGroup._id);
   }, [showAddMember, activeGroup]);
 
+  // Keep the latest active conversation available inside long-lived socket handlers
+  useEffect(() => {
+    activeIdRef.current = activeId;
+  }, [activeId]);
+
+  // ONE persistent socket for the whole chat session — switching conversations
+  // never disconnects/reconnects (instant presence + instant messages)
   useEffect(() => {
     const token = localStorage.getItem("accTkn");
     const socket = io(SOCKET_URL, {
@@ -184,30 +192,46 @@ export default function Chat() {
     });
     socketRef.current = socket;
 
-    socket.emit("chat:join", { conversationId: activeId });
-
     socket.on("message:new", (msg) => {
+      const convId = msg.conversation?._id || msg.conversation;
       const senderId = msg.sender?._id || msg.sender;
       const isMine = senderId === user?._id;
-      setMessages((prev) => {
-        if (prev.some((m) => m._id === msg._id)) return prev;
-        return [...prev, msg];
+      const isActiveConv = convId === activeIdRef.current;
+
+      if (isActiveConv) {
+        setMessages((prev) => (prev.some((m) => m._id === msg._id) ? prev : [...prev, msg]));
+      } else {
+        setUnreadIds((prev) => new Set(prev).add(convId));
+      }
+
+      // Keep the conversation list preview + order fresh without a reload
+      setConversations((prev) => {
+        const next = prev.map((c) =>
+          c._id === convId
+            ? {
+                ...c,
+                lastMessage: { text: msg.text || "", sender: msg.sender },
+                lastMessageAt: msg.createdAt || new Date().toISOString(),
+              }
+            : c
+        );
+        return next.sort((a, b) => new Date(b.lastMessageAt || 0) - new Date(a.lastMessageAt || 0));
       });
+
       if (!isMine) {
         playNotificationSound();
         setToast(`New message from ${msg.sender?.fullname || "Someone"}`);
         setTimeout(() => setToast(""), 3000);
-        if (msg.conversation !== activeId) {
-          setUnreadIds((prev) => new Set(prev).add(msg.conversation));
+        if (isActiveConv) {
+          setHighlighted((prev) => new Set(prev).add(msg._id));
+          setTimeout(() => {
+            setHighlighted((prev) => {
+              const next = new Set(prev);
+              next.delete(msg._id);
+              return next;
+            });
+          }, 3000);
         }
-        setHighlighted((prev) => new Set(prev).add(msg._id));
-        setTimeout(() => {
-          setHighlighted((prev) => {
-            const next = new Set(prev);
-            next.delete(msg._id);
-            return next;
-          });
-        }, 3000);
       }
     });
 
@@ -223,7 +247,7 @@ export default function Chat() {
         next.delete(conversationId);
         return next;
       });
-      if (conversationId === activeId) {
+      if (conversationId === activeIdRef.current) {
         setActiveId(null);
         setMessages([]);
         setMobileView("list");
@@ -253,6 +277,13 @@ export default function Chat() {
     });
 
     return () => socket.disconnect();
+  }, []);
+
+  // Join the open conversation's room (socket already alive — instant)
+  useEffect(() => {
+    if (activeId && socketRef.current) {
+      socketRef.current.emit("chat:join", { conversationId: activeId });
+    }
   }, [activeId]);
 
   useEffect(() => {
