@@ -2,6 +2,7 @@ import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
+import { ToastProvider } from "./context/ToastContext";
 import PublicLayout from "./components/PublicLayout";
 import DashboardShell from "./components/DashboardShell";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -27,8 +28,9 @@ import ResetPassword from "./pages/ResetPassword";
 export default function App() {
   return (
     <ThemeProvider>
-    <AuthProvider>
-      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <AuthProvider>
+        <ToastProvider>
+          <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Routes>
           {/* Auth pages — clean, full screen, no navbar */}
           <Route path="/login" element={<Login />} />
@@ -62,7 +64,8 @@ export default function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
-    </AuthProvider>
+        </ToastProvider>
+      </AuthProvider>
     </ThemeProvider>
   );
 }

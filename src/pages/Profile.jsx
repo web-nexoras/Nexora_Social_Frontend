@@ -1,23 +1,44 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import api from "../api/axios";
+import { useToast } from "../context/ToastContext";
+import { FiCamera, FiMail, FiMapPin, FiShield, FiUser } from "react-icons/fi";
 
 export default function Profile() {
   const { user, updateProfile } = useAuth();
+  const { showToast } = useToast();
+
   const [form, setForm] = useState({ fullname: "", address: "" });
   const [file, setFile] = useState(null);
-  const [msg, setMsg] = useState("");
+  const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [imgError, setImgError] = useState(false);
 
   useEffect(() => {
     if (user) {
       setForm({ fullname: user.fullname || "", address: user.address || "" });
+      setPreview(user.avatar || null);
     }
   }, [user]);
 
+  const handleFileChange = (e) => {
+    const selected = e.target.files?.[0] || null;
+    setFile(selected);
+    if (selected) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreview(reader.result);
+        setImgError(false);
+      };
+      reader.readAsDataURL(selected);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setMsg("");
+    if (!form.fullname.trim()) {
+      showToast("Full name cannot be empty", "error");
+      return;
+    }
     setLoading(true);
     try {
       const fd = new FormData();
@@ -25,9 +46,10 @@ export default function Profile() {
       fd.append("address", form.address);
       if (file) fd.append("avatar", file);
       await updateProfile(fd);
-      setMsg("Profile updated successfully");
+      showToast("Profile updated successfully!", "success");
     } catch (err) {
-      setMsg(err?.response?.data?.message || "Update failed");
+      const errMsg = err?.response?.data?.message || "Profile update failed";
+      showToast(errMsg, "error");
     } finally {
       setLoading(false);
     }
@@ -35,52 +57,106 @@ export default function Profile() {
 
   if (!user) return null;
 
+  const initials = (user.fullname || "User")
+    .split(" ")
+    .map((w) => w[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+
   return (
-    <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-lg p-8 mt-6">
-      <div className="flex items-center gap-6 mb-6">
-        <img
-          src={user.avatar || "https://via.placeholder.com/96"}
-          alt="avatar"
-          className="w-24 h-24 rounded-full object-cover border-4 border-brand"
-        />
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800">{user.fullname}</h1>
-          <p className="text-slate-500">{user.email}</p>
-          <p className="text-sm text-slate-400">{user.role}</p>
+    <div className="max-w-3xl mx-auto mt-6 px-4 sm:px-0">
+      <div className="bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden">
+        {/* Dark Cover banner matching admin overview */}
+        <div className="relative h-44 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 overflow-hidden border-b border-slate-800/80">
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-600/25 via-slate-900/40 to-transparent"></div>
+          <div className="absolute top-4 right-4 flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/10 px-3 py-1 rounded-full text-xs font-semibold text-slate-200">
+            <FiShield className="text-indigo-400" />
+            <span className="capitalize">{user.role} Settings</span>
+          </div>
+        </div>
+
+        {/* Profile Content */}
+        <div className="px-6 sm:px-8 pb-8">
+          <div className="flex flex-col sm:flex-row sm:items-end gap-4 -mt-16 mb-6">
+            {/* Avatar container with photo upload overlay */}
+            <div className="relative w-28 h-28 rounded-full border-4 border-white shadow-2xl overflow-hidden bg-slate-900 shrink-0 group">
+              {preview && !imgError ? (
+                <img
+                  src={preview}
+                  alt={user.fullname}
+                  onError={() => setImgError(true)}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-indigo-600 via-indigo-700 to-slate-900 flex items-center justify-center text-white text-2xl font-black tracking-wider">
+                  {initials}
+                </div>
+              )}
+              <label className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white text-xs cursor-pointer">
+                <FiCamera className="text-lg mb-0.5" />
+                Change
+                <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+              </label>
+            </div>
+
+            <div className="pb-1">
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">{user.fullname}</h1>
+              <p className="text-sm text-slate-500 flex items-center gap-1.5 mt-0.5">
+                <FiMail className="text-slate-400" /> {user.email}
+              </p>
+            </div>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-1">Full Name</label>
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Full Name"
+                  value={form.fullname}
+                  onChange={(e) => setForm({ ...form, fullname: e.target.value })}
+                  className="w-full neo-input rounded-xl px-4 py-3 text-slate-700 text-sm"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-1">Address</label>
+              <input
+                type="text"
+                placeholder="Your address"
+                value={form.address}
+                onChange={(e) => setForm({ ...form, address: e.target.value })}
+                className="w-full neo-input rounded-xl px-4 py-3 text-slate-700 text-sm"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-1">Profile Photo</label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                className="w-full text-xs text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-slate-900 file:text-white hover:file:bg-slate-800 file:cursor-pointer cursor-pointer"
+              />
+            </div>
+
+            <div className="pt-2">
+              <button
+                type="submit"
+                disabled={loading}
+                className="px-6 py-3 rounded-xl bg-gradient-to-r from-brand to-indigo-600 text-white font-semibold text-sm shadow-md hover:shadow-lg transition disabled:opacity-60"
+              >
+                {loading ? "Saving Changes..." : "Save Changes"}
+              </button>
+            </div>
+          </form>
         </div>
       </div>
-
-      {msg && <p className="text-sm mb-4 text-brand">{msg}</p>}
-
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <input
-          type="text"
-          placeholder="Full Name"
-          value={form.fullname}
-          onChange={(e) => setForm({ ...form, fullname: e.target.value })}
-          className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-brand"
-        />
-        <input
-          type="text"
-          placeholder="Address"
-          value={form.address}
-          onChange={(e) => setForm({ ...form, address: e.target.value })}
-          className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-brand"
-        />
-        <input
-          type="file"
-          accept="image/*"
-          onChange={(e) => setFile(e.target.files?.[0] || null)}
-          className="w-full"
-        />
-        <button
-          type="submit"
-          disabled={loading}
-          className="px-6 py-2 rounded-lg bg-brand text-white font-semibold hover:bg-indigo-700 transition disabled:opacity-60"
-        >
-          {loading ? "Saving..." : "Save Changes"}
-        </button>
-      </form>
     </div>
   );
 }

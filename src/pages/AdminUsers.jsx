@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { usersApi } from "../api/usersApi";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 import { FiCheck, FiX } from "react-icons/fi";
 
 export default function AdminUsers() {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
@@ -36,9 +38,12 @@ export default function AdminUsers() {
     try {
       await usersApi.approve(id);
       setMsg("User approved");
+      showToast("User approved successfully!", "success");
       load();
     } catch (e) {
-      setMsg(e?.response?.data?.message || "Failed");
+      const err = e?.response?.data?.message || "Failed to approve user";
+      setMsg(err);
+      showToast(err, "error");
     }
   };
 
@@ -46,9 +51,12 @@ export default function AdminUsers() {
     try {
       await usersApi.reject(id);
       setMsg("User rejected");
+      showToast("User rejected", "warning");
       load();
     } catch (e) {
-      setMsg(e?.response?.data?.message || "Failed");
+      const err = e?.response?.data?.message || "Failed to reject user";
+      setMsg(err);
+      showToast(err, "error");
     }
   };
 
@@ -56,9 +64,12 @@ export default function AdminUsers() {
     try {
       await usersApi.toggle(id);
       setMsg("Status toggled");
+      showToast("User status updated", "info");
       load();
     } catch (e) {
-      setMsg(e?.response?.data?.message || "Failed");
+      const err = e?.response?.data?.message || "Failed to toggle status";
+      setMsg(err);
+      showToast(err, "error");
     }
   };
 
