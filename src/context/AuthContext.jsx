@@ -10,6 +10,13 @@ export function AuthProvider({ children }) {
   // Load current user on app start
   useEffect(() => {
     const loadUser = async () => {
+      const token = localStorage.getItem("accTkn");
+      if (!token || token === "undefined" || token === "null") {
+        localStorage.removeItem("accTkn");
+        setUser(null);
+        setLoading(false);
+        return;
+      }
       try {
         const res = await authApi.getProfile();
         setUser(res.data?.user || res.data);
@@ -25,15 +32,16 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     const res = await authApi.signin(email, password);
-    if (res.data?.accessToken) {
-      localStorage.setItem("accTkn", res.data.accessToken);
+    const token = res.data?.accessToken;
+    if (token && token !== "undefined" && token !== "null") {
+      localStorage.setItem("accTkn", token);
     }
     if (res.data?.user) {
       setUser(res.data.user);
-    } else {
-      const me = await authApi.getProfile();
-      setUser(me.data?.user || me.data);
+      return res.data;
     }
+    const me = await authApi.getProfile();
+    setUser(me.data?.user || me.data);
     return res.data;
   };
 

@@ -177,8 +177,11 @@ export default function Chat() {
   }, [showAddMember, activeGroup]);
 
   useEffect(() => {
-    if (!activeId) return;
-    const socket = io(SOCKET_URL, { withCredentials: true });
+    const token = localStorage.getItem("accTkn");
+    const socket = io(SOCKET_URL, {
+      withCredentials: true,
+      auth: token && token !== "undefined" ? { token } : {},
+    });
     socketRef.current = socket;
 
     socket.emit("chat:join", { conversationId: activeId });
