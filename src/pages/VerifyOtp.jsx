@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { FiArrowLeft, FiArrowRight, FiCheckCircle } from "react-icons/fi";
-import { useLocation, Link } from "react-router-dom";
+import { useLocation, useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { authApi } from "../api/authApi";
@@ -10,8 +10,10 @@ export default function VerifyOtp() {
   const { verifyOtp } = useAuth();
   const { showToast } = useToast();
   const location = useLocation();
+  const navigate = useNavigate();
 
-  const [email, setEmail] = useState(location.state?.email || "");
+  const initialEmail = location.state?.email || "";
+  const [email, setEmail] = useState(initialEmail);
   const [otp, setOtp] = useState("");
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
@@ -37,6 +39,7 @@ export default function VerifyOtp() {
       await verifyOtp(email, otp);
       setMsg("Email verified successfully! Your account is now pending admin approval. You can log in once an admin approves your account.");
       showToast("Email verified! Account pending admin approval.", "success", 6000);
+      setTimeout(() => navigate("/login"), 1500);
     } catch (err) {
       const errMsg = err?.response?.data?.message || "OTP verification failed. Check the code and try again.";
       setError(errMsg);
@@ -111,24 +114,26 @@ export default function VerifyOtp() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-        <div className="space-y-1">
-          {fieldErrors.email && (
-            <p className="mb-px px-1 text-rose-700 text-xs font-bold">{fieldErrors.email}</p>
-          )}
-          <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => {
-              setEmail(e.target.value);
-              if (fieldErrors.email) setFieldErrors((p) => ({ ...p, email: "" }));
-            }}
-            autoComplete="email"
-            className={`w-full neo-input rounded-xl px-4 py-3 text-slate-700 text-sm transition ${
-              fieldErrors.email ? "border-rose-500 bg-rose-50/20 ring-1 ring-rose-400" : ""
-            }`}
-          />
-        </div>
+        {!initialEmail && (
+          <div className="space-y-1">
+            {fieldErrors.email && (
+              <p className="mb-px px-1 text-rose-700 text-xs font-bold">{fieldErrors.email}</p>
+            )}
+            <input
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (fieldErrors.email) setFieldErrors((p) => ({ ...p, email: "" }));
+              }}
+              autoComplete="email"
+              className={`w-full neo-input rounded-xl px-4 py-3 text-slate-700 text-sm transition ${
+                fieldErrors.email ? "border-rose-500 bg-rose-50/20 ring-1 ring-rose-400" : ""
+              }`}
+            />
+          </div>
+        )}
         <div className="space-y-1">
           {fieldErrors.otp && (
             <p className="mb-px px-1 text-rose-700 text-xs font-bold">{fieldErrors.otp}</p>
