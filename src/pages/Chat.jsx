@@ -18,7 +18,9 @@ import {
   FiArrowLeft,
 } from "react-icons/fi";
 
-const SOCKET_URL = import.meta.env.VITE_API_URL?.replace("/api/v1", "") || "http://localhost:5000";
+const SOCKET_URL =
+  import.meta.env.VITE_API_URL?.replace("/api/v1", "") ||
+  "http://localhost:5000";
 
 export default function Chat() {
   const [searchParams] = useSearchParams();
@@ -199,7 +201,9 @@ export default function Chat() {
       const isActiveConv = convId === activeIdRef.current;
 
       if (isActiveConv) {
-        setMessages((prev) => (prev.some((m) => m._id === msg._id) ? prev : [...prev, msg]));
+        setMessages((prev) =>
+          prev.some((m) => m._id === msg._id) ? prev : [...prev, msg],
+        );
       } else {
         setUnreadIds((prev) => new Set(prev).add(convId));
       }
@@ -213,9 +217,12 @@ export default function Chat() {
                 lastMessage: { text: msg.text || "", sender: msg.sender },
                 lastMessageAt: msg.createdAt || new Date().toISOString(),
               }
-            : c
+            : c,
         );
-        return next.sort((a, b) => new Date(b.lastMessageAt || 0) - new Date(a.lastMessageAt || 0));
+        return next.sort(
+          (a, b) =>
+            new Date(b.lastMessageAt || 0) - new Date(a.lastMessageAt || 0),
+        );
       });
 
       if (!isMine) {
@@ -272,7 +279,11 @@ export default function Chat() {
     // A message was edited by its author (or an admin)
     socket.on("message:updated", ({ message }) => {
       setMessages((prev) =>
-        prev.map((m) => (m._id === message._id ? { ...m, text: message.text, editedAt: message.editedAt } : m))
+        prev.map((m) =>
+          m._id === message._id
+            ? { ...m, text: message.text, editedAt: message.editedAt }
+            : m,
+        ),
       );
     });
 
@@ -313,7 +324,11 @@ export default function Chat() {
     try {
       await chatApi.updateMessage(messageId, nextText);
       setMessages((prev) =>
-        prev.map((m) => (m._id === messageId ? { ...m, text: nextText, editedAt: new Date() } : m))
+        prev.map((m) =>
+          m._id === messageId
+            ? { ...m, text: nextText, editedAt: new Date() }
+            : m,
+        ),
       );
       cancelEdit();
     } catch (e) {
@@ -405,7 +420,12 @@ export default function Chat() {
 
   const removeConversation = async (c) => {
     const label = c.type === "group" ? c.groupName : "this conversation";
-    if (!window.confirm(`Delete "${label}" and all of its messages? This cannot be undone.`)) return;
+    if (
+      !window.confirm(
+        `Delete "${label}" and all of its messages? This cannot be undone.`,
+      )
+    )
+      return;
     try {
       await chatApi.deleteConversation(c._id);
       setConversations((prev) => prev.filter((x) => x._id !== c._id));
@@ -453,7 +473,11 @@ export default function Chat() {
     try {
       const res = await groupsApi.addMembers(activeGroup._id, [userId]);
       const added = res.data?.addedCount ?? 0;
-      setMemberMsg(added > 0 ? `${name || "Member"} was added to ${activeGroup.name}` : "Already a member of this group");
+      setMemberMsg(
+        added > 0
+          ? `${name || "Member"} was added to ${activeGroup.name}`
+          : "Already a member of this group",
+      );
       setMemberQuery("");
       setMemberResults([]);
       loadMembers(activeGroup._id); // refresh so the added member shows in the list below
@@ -465,12 +489,18 @@ export default function Chat() {
   };
 
   const activeConv = conversations.find((c) => c._id === activeId);
-  const otherParticipant = activeConv?.participants?.find((p) => p._id !== user?._id) || activeConv?.participants?.[0];
-  const isOtherOnline = Boolean(otherParticipant && onlineIds.has(otherParticipant._id));
+  const otherParticipant =
+    activeConv?.participants?.find((p) => p._id !== user?._id) ||
+    activeConv?.participants?.[0];
+  const isOtherOnline = Boolean(
+    otherParticipant && onlineIds.has(otherParticipant._id),
+  );
 
   const grouped = messages.reduce((acc, msg, idx) => {
     const prev = messages[idx - 1];
-    const isSameSender = prev && (prev.sender?._id || prev.sender) === (msg.sender?._id || msg.sender);
+    const isSameSender =
+      prev &&
+      (prev.sender?._id || prev.sender) === (msg.sender?._id || msg.sender);
     if (isSameSender && acc.length) {
       acc[acc.length - 1].messages.push(msg);
     } else {
@@ -493,15 +523,19 @@ export default function Chat() {
             <div className="w-12 h-12 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center text-2xl mb-3">
               <FiLock />
             </div>
-            <h3 className="text-xl font-bold text-brand mb-2">Join this group</h3>
+            <h3 className="text-xl font-bold text-brand mb-2">
+              Join this group
+            </h3>
             <p className="text-slate-600 mb-3">
-              You are not a member of <strong>{lockedGroup.name}</strong> yet. If you want to be
-              added to this group, you can subscribe.
+              You are not a member of <strong>{lockedGroup.name}</strong> yet.
+              If you want to be added to this group, you can subscribe.
             </p>
             <p className="text-sm text-slate-500 mb-6">
               After a successful payment, the admin will add you to the group.
             </p>
-            {subscribeMsg && <p className="text-sm text-red-500 mb-4">{subscribeMsg}</p>}
+            {subscribeMsg && (
+              <p className="text-sm text-red-500 mb-4">{subscribeMsg}</p>
+            )}
             <div className="flex gap-3">
               <button
                 onClick={subscribeGroup}
@@ -530,7 +564,8 @@ export default function Chat() {
             </div>
             <h3 className="text-xl font-bold text-brand mb-1">Add member</h3>
             <p className="text-sm text-slate-500 mb-4">
-              Adding to <strong>{activeGroup.name}</strong> — free, no payment needed.
+              Adding to <strong>{activeGroup.name}</strong> — free, no payment
+              needed.
             </p>
             <input
               value={memberQuery}
@@ -545,10 +580,19 @@ export default function Chat() {
                 </p>
               )}
               {memberResults.map((u) => (
-                <div key={u._id} className="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2">
-                  <img src={u.avatar || "https://via.placeholder.com/32"} alt="" className="w-7 h-7 rounded-full object-cover" />
+                <div
+                  key={u._id}
+                  className="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2"
+                >
+                  <img
+                    src={u.avatar || "https://via.placeholder.com/32"}
+                    alt=""
+                    className="w-7 h-7 rounded-full object-cover"
+                  />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-slate-800 truncate">{u.fullname}</p>
+                    <p className="text-sm font-medium text-slate-800 truncate">
+                      {u.fullname}
+                    </p>
                     <p className="text-xs text-slate-400 truncate">{u.email}</p>
                   </div>
                   <button
@@ -561,25 +605,36 @@ export default function Chat() {
                 </div>
               ))}
             </div>
-            {memberMsg && <p className="text-sm text-slate-700 mb-3">{memberMsg}</p>}
+            {memberMsg && (
+              <p className="text-sm text-slate-700 mb-3">{memberMsg}</p>
+            )}
             <div className="mb-4">
               <p className="text-xs font-semibold text-slate-500 uppercase mb-2">
                 Current members ({groupMembers.length})
               </p>
               <div className="max-h-32 overflow-y-auto space-y-2">
                 {groupMembers.length === 0 && (
-                  <p className="text-sm text-slate-400 text-center py-2">No members yet</p>
+                  <p className="text-sm text-slate-400 text-center py-2">
+                    No members yet
+                  </p>
                 )}
                 {groupMembers.map((m) => (
-                  <div key={m._id} className="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2">
+                  <div
+                    key={m._id}
+                    className="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2"
+                  >
                     <img
                       src={m.user?.avatar || "https://via.placeholder.com/32"}
                       alt=""
                       className="w-6 h-6 rounded-full object-cover"
                     />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm text-slate-800 truncate">{m.user?.fullname}</p>
-                      <p className="text-xs text-slate-400 truncate">{m.user?.email}</p>
+                      <p className="text-sm text-slate-800 truncate">
+                        {m.user?.fullname}
+                      </p>
+                      <p className="text-xs text-slate-400 truncate">
+                        {m.user?.email}
+                      </p>
                     </div>
                   </div>
                 ))}
@@ -610,11 +665,18 @@ export default function Chat() {
 
       <div className="flex flex-col md:grid md:grid-cols-3 gap-6">
         {/* Conversation list */}
-        <div className={`bg-white rounded-2xl shadow p-4 md:col-span-1 max-h-48 md:max-h-none md:h-[70vh] overflow-y-auto ${mobileView === "chat" ? "hidden md:block" : "block"}`}>
+        <div
+          className={`bg-white rounded-2xl shadow p-4 md:col-span-1 max-h-48 md:max-h-none md:h-[70vh] overflow-y-auto ${mobileView === "chat" ? "hidden md:block" : "block"}`}
+        >
           <h2 className="text-xl font-bold text-brand mb-4">Conversations</h2>
-          {conversations.length === 0 && <p className="text-slate-500 text-sm">No conversations yet</p>}
+          {conversations.length === 0 && (
+            <p className="text-slate-500 text-sm">No conversations yet</p>
+          )}
           {conversations.map((c) => {
-            const other = c.type === "group" ? null : c.participants?.find((p) => p._id !== user?._id);
+            const other =
+              c.type === "group"
+                ? null
+                : c.participants?.find((p) => p._id !== user?._id);
             const unread = unreadIds.has(c._id);
             return (
               <div
@@ -628,21 +690,35 @@ export default function Chat() {
                   });
                 }}
                 className={`group/conv w-full text-left p-3 rounded-xl mb-2 transition flex items-center gap-3 cursor-pointer ${
-                  unread ? "bg-slate-200 ring-2 ring-slate-400" : activeId === c._id ? "bg-slate-300" : "hover:bg-slate-100"
+                  unread
+                    ? "bg-slate-200 ring-2 ring-slate-400"
+                    : activeId === c._id
+                      ? "bg-slate-300"
+                      : "hover:bg-slate-100"
                 }`}
               >
-                <img src={other?.avatar || "https://via.placeholder.com/40"} alt="" className="w-10 h-10 rounded-full object-cover" />
+                <img
+                  src={other?.avatar || "https://via.placeholder.com/40"}
+                  alt=""
+                  className="w-10 h-10 rounded-full object-cover"
+                />
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-slate-800 text-sm truncate flex items-center gap-1.5">
-                    <span className="truncate">{c.type === "group" ? c.groupName : other?.fullname}</span>
+                    <span className="truncate">
+                      {c.type === "group" ? c.groupName : other?.fullname}
+                    </span>
                     {c.type !== "group" && other && (
                       <span
-                        title={onlineIds.has(other._id) ? "Active now" : "Offline"}
+                        title={
+                          onlineIds.has(other._id) ? "Active now" : "Offline"
+                        }
                         className={`h-2 w-2 rounded-full shrink-0 ${onlineIds.has(other._id) ? "bg-green-500 animate-pulse shadow-[0_0_6px_rgba(34,197,94,0.9)]" : "bg-slate-300"}`}
                       />
                     )}
                   </p>
-                  <p className="text-xs text-slate-400 truncate">{c.lastMessage?.text || "No messages yet"}</p>
+                  <p className="text-xs text-slate-400 truncate">
+                    {c.lastMessage?.text || "No messages yet"}
+                  </p>
                 </div>
                 <div className="relative shrink-0">
                   <button
@@ -678,7 +754,9 @@ export default function Chat() {
         </div>
 
         {/* Chat window */}
-        <div className={`bg-white rounded-2xl shadow md:col-span-2 flex flex-col h-[60vh] md:h-[70vh] ${mobileView === "list" ? "hidden md:flex" : "flex"}`}>
+        <div
+          className={`bg-white rounded-2xl shadow md:col-span-2 flex flex-col h-[60vh] md:h-[70vh] ${mobileView === "list" ? "hidden md:flex" : "flex"}`}
+        >
           <div className="px-6 py-4 border-b flex items-center gap-3">
             <button
               onClick={() => setMobileView("list")}
@@ -688,16 +766,22 @@ export default function Chat() {
               <FiArrowLeft className="h-5 w-5 text-slate-700" />
             </button>
             {otherParticipant && (
-              <img src={otherParticipant.avatar || "https://via.placeholder.com/40"} alt="" className="w-9 h-9 rounded-full object-cover" />
+              <img
+                src={
+                  otherParticipant.avatar || "https://via.placeholder.com/40"
+                }
+                alt=""
+                className="w-9 h-9 rounded-full object-cover"
+              />
             )}
             <h2 className="text-xl font-bold text-brand">
               {lockedGroup
                 ? lockedGroup.name
                 : activeConv
-                ? activeConv.type === "group"
-                  ? activeConv.groupName
-                  : otherParticipant?.fullname
-                : "Select a conversation"}
+                  ? activeConv.type === "group"
+                    ? activeConv.groupName
+                    : otherParticipant?.fullname
+                  : "Select a conversation"}
               {lockedGroup && (
                 <span className="ml-2 inline-flex items-center gap-1 text-xs font-semibold text-slate-500">
                   <FiLock /> Not joined
@@ -731,17 +815,31 @@ export default function Chat() {
             )}
           </div>
           <div className="flex-1 overflow-y-auto p-6 space-y-4">
-            {loading && <p className="text-center text-slate-400">Loading...</p>}
+            {loading && (
+              <p className="text-center text-slate-400">Loading...</p>
+            )}
             {grouped.map((group, gi) => {
               const senderId = group.sender?._id || group.sender;
               const isMe = senderId === user?._id;
               return (
-                <div key={gi} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
+                <div
+                  key={gi}
+                  className={`flex ${isMe ? "justify-end" : "justify-start"}`}
+                >
                   <div className="max-w-[75%]">
                     {!isMe && (
                       <div className="flex items-center gap-2 mb-1">
-                        <img src={group.sender?.avatar || "https://via.placeholder.com/24"} alt="" className="w-6 h-6 rounded-full" />
-                        <span className="text-xs font-semibold text-slate-500">{group.sender?.fullname}</span>
+                        <img
+                          src={
+                            group.sender?.avatar ||
+                            "https://via.placeholder.com/24"
+                          }
+                          alt=""
+                          className="w-6 h-6 rounded-full"
+                        />
+                        <span className="text-xs font-semibold text-slate-500">
+                          {group.sender?.fullname}
+                        </span>
                       </div>
                     )}
                     <div className="space-y-1">
@@ -779,19 +877,24 @@ export default function Chat() {
                             </button>
                           </div>
                         ) : (
-                          <div key={m._id} className="group/msg flex items-center gap-1">
+                          <div
+                            key={m._id}
+                            className="group/msg flex items-center gap-1"
+                          >
                             <div
                               className={`px-4 py-2 rounded-2xl transition ${
                                 highlighted.has(m._id)
                                   ? "ring-2 ring-accent bg-accent/10"
                                   : isMe
-                                  ? "bg-brand text-white rounded-br-sm"
-                                  : "bg-slate-100 text-slate-800 rounded-bl-sm"
+                                    ? "bg-brand text-white rounded-br-sm"
+                                    : "bg-slate-100 text-slate-800 rounded-bl-sm"
                               }`}
                             >
                               {m.text}
                               {m.editedAt && (
-                                <span className="ml-1.5 text-[10px] opacity-70 align-middle">(edited)</span>
+                                <span className="ml-1.5 text-[10px] opacity-70 align-middle">
+                                  (edited)
+                                </span>
                               )}
                             </div>
                             {isMe && (
@@ -815,7 +918,7 @@ export default function Chat() {
                               </button>
                             )}
                           </div>
-                        )
+                        ),
                       )}
                     </div>
                   </div>
@@ -844,7 +947,10 @@ export default function Chat() {
                 placeholder="Type a message..."
                 className="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-brand"
               />
-              <button type="submit" className="px-4 py-2 rounded-lg bg-brand text-white font-semibold hover:bg-indigo-700 transition">
+              <button
+                type="submit"
+                className="px-4 py-2 rounded-lg bg-brand text-white font-semibold hover:bg-indigo-700 transition"
+              >
                 Send
               </button>
             </form>
