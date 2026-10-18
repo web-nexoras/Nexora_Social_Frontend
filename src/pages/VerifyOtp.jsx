@@ -12,27 +12,23 @@ export default function VerifyOtp() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const initialEmail = location.state?.email || "";
-  const [email, setEmail] = useState(initialEmail);
+  const [email] = useState(location.state?.email || "");
   const [otp, setOtp] = useState("");
+  const [otpError, setOtpError] = useState("");
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(false);
-  const [devOtp, setDevOtp] = useState(location.state?.devOtp || "");
-  // Per-field errors: shown only on submit, only under the field that's wrong
-  const [fieldErrors, setFieldErrors] = useState({ email: "", otp: "" });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setMsg("");
 
-    const errs = { email: "", otp: "" };
-    if (!email.trim()) errs.email = "Email is required";
-    if (!otp.trim()) errs.otp = "OTP code is required";
-    else if (otp.trim().length !== 6) errs.otp = "Please enter the complete 6-digit OTP code";
-    setFieldErrors(errs);
-    if (errs.email || errs.otp) return;
+    if (!otp.trim() || otp.trim().length !== 6) {
+      setOtpError("Please enter the complete 6-digit OTP code");
+      return;
+    }
+    setOtpError("");
 
     setLoading(true);
     try {
@@ -52,13 +48,12 @@ export default function VerifyOtp() {
   const resend = async () => {
     setError("");
     setMsg("");
-    if (!email.trim()) {
-      setFieldErrors((p) => ({ ...p, email: "Email is required" }));
+    if (!email) {
+      setError("Email not found. Please sign up again.");
       return;
     }
     try {
-      const data = await authApi.resendOtp(email);
-      if (data?.data?.devOtp) setDevOtp(data.data.devOtp);
+      await authApi.resendOtp(email);
       setMsg("A new OTP has been sent to your email.");
       showToast("A new OTP has been sent to your email.", "info");
     } catch (err) {
@@ -100,43 +95,10 @@ export default function VerifyOtp() {
         </div>
       )}
 
-      {devOtp && (
-        <div className="mb-4 text-center bg-slate-50 border border-slate-200 rounded-xl py-2 px-3">
-          <p className="text-xs text-slate-500 mb-1">Dev OTP (for testing without email):</p>
-          <button
-            type="button"
-            onClick={() => setOtp(devOtp)}
-            className="inline-flex items-center gap-1 text-brand text-lg font-bold tracking-widest hover:underline"
-          >
-            {devOtp} — tap to fill <FiArrowRight />
-          </button>
-        </div>
-      )}
-
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-        {!initialEmail && (
-          <div className="space-y-1">
-            {fieldErrors.email && (
-              <p className="mb-px px-1 text-rose-700 text-xs font-bold">{fieldErrors.email}</p>
-            )}
-            <input
-              type="email"
-              placeholder="Email"
-              value={email}
-              onChange={(e) => {
-                setEmail(e.target.value);
-                if (fieldErrors.email) setFieldErrors((p) => ({ ...p, email: "" }));
-              }}
-              autoComplete="email"
-              className={`w-full neo-input rounded-xl px-4 py-3 text-slate-700 text-sm transition ${
-                fieldErrors.email ? "border-rose-500 bg-rose-50/20 ring-1 ring-rose-400" : ""
-              }`}
-            />
-          </div>
-        )}
         <div className="space-y-1">
-          {fieldErrors.otp && (
-            <p className="mb-px px-1 text-rose-700 text-xs font-bold">{fieldErrors.otp}</p>
+          {otpError && (
+            <p className="mb-px px-1 text-rose-700 text-xs font-bold">{otpError}</p>
           )}
           <input
             type="text"
@@ -146,10 +108,10 @@ export default function VerifyOtp() {
             value={otp}
             onChange={(e) => {
               setOtp(e.target.value.replace(/\D/g, ""));
-              if (fieldErrors.otp) setFieldErrors((p) => ({ ...p, otp: "" }));
+              if (otpError) setOtpError("");
             }}
             className={`w-full neo-input rounded-xl px-4 py-3 text-slate-700 text-sm tracking-widest text-center font-mono font-semibold transition ${
-              fieldErrors.otp ? "border-rose-500 bg-rose-50/20 ring-1 ring-rose-400" : ""
+              otpError ? "border-rose-500 bg-rose-50/20 ring-1 ring-rose-400" : ""
             }`}
           />
         </div>
