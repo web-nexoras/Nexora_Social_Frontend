@@ -1,48 +1,30 @@
 import React from "react";
 import { FiCreditCard } from "react-icons/fi";
+import bkashLogo from "../assets/bkash2.png";
+import nagadLogo from "../assets/nagad.png";
+import upayLogo from "../assets/upay.svg";
 
-// Brand icon snippets (inline SVG so they always render, no network needed)
-const ICONS = {
-  bkash: (
-    <svg viewBox="0 0 48 48" className="w-9 h-9">
-      <rect width="48" height="48" rx="12" fill="#e2136e" />
+// Rocket has no public logo asset — drawn inline in its brand purple
+const RocketMark = () => (
+  <span className="flex items-center gap-2">
+    <svg viewBox="0 0 48 48" className="h-8 w-8 shrink-0">
+      <rect width="48" height="48" rx="12" fill="#8c3494" />
       <path
-        d="M17 12v13.5c0 3 1.6 4.7 4.3 4.7 1.4 0 2.6-.4 3.7-1.2l2.7 3.2c-1.7 1.4-3.9 2.1-6.5 2.1-5.2 0-8.5-3.2-8.5-8.7V12h4z"
+        d="M31 9.5c-8.6 1.4-15.3 8-17.8 16.6l-3.4 6.8 3.4 1.7 1.9-4.4c6.4-1.5 12.7-5.2 17.2-11.7l-4.2 3.4-4.4-4.4 7.3-8z"
         fill="#fff"
       />
-      <path d="M28.5 18.2l2.2-2.2 4.3 4.3-2.2 2.2z" fill="#fff" />
-      <circle cx="31.5" cy="30" r="4.5" fill="none" stroke="#fff" strokeWidth="2.6" />
+      <circle cx="18.5" cy="31.5" r="1.7" fill="#fff" opacity="0.85" />
+      <path d="M12 36l4-1.5-2.4-2.4z" fill="#fff" opacity="0.7" />
     </svg>
-  ),
-  nagad: (
-    <svg viewBox="0 0 48 48" className="w-9 h-9">
-      <rect width="48" height="48" rx="12" fill="#f6921e" />
-      <path d="M14 34V14h4l8 12V14h4v20h-4l-8-12v12z" fill="#fff" />
-      <path d="M32 14h4v20h-4z" fill="#fff" opacity="0.85" />
-    </svg>
-  ),
-  rocket: (
-    <svg viewBox="0 0 48 48" className="w-9 h-9">
-      <rect width="48" height="48" rx="12" fill="#8c3494" />
-      <path d="M24 10c6 4 9 9 9 15l-3 6h-12l-3-6c0-6 3-11 9-15z" fill="#fff" />
-      <circle cx="24" cy="22" r="3.4" fill="#8c3494" />
-      <path d="M18 34l-3 5 6-2zM30 34l3 5-6-2z" fill="#fff" />
-    </svg>
-  ),
-  upay: (
-    <svg viewBox="0 0 48 48" className="w-9 h-9">
-      <rect width="48" height="48" rx="12" fill="#ed017f" />
-      <path d="M13 16l5 12 5-12h4l-7 16h-4l-7-16z" fill="#fff" />
-      <path d="M27 16h5l2.5 6L37 16h5l-7 16h-4z" fill="#fff" />
-    </svg>
-  ),
-};
+    <span className="font-bold text-slate-800 text-sm">Rocket</span>
+  </span>
+);
 
 const METHODS = [
-  { id: "bkash", name: "bKash" },
-  { id: "nagad", name: "Nagad" },
-  { id: "rocket", name: "Rocket" },
-  { id: "upay", name: "Upay" },
+  { id: "bkash", name: "bKash", logo: bkashLogo },
+  { id: "nagad", name: "Nagad", logo: nagadLogo },
+  { id: "rocket", name: "Rocket", mark: <RocketMark /> },
+  { id: "upay", name: "Upay", logo: upayLogo },
 ];
 
 // Custom mobile-banking payment screen shown instead of the SSLCommerz hosted page.
@@ -68,12 +50,15 @@ export default function PaymentMethodModal({ group, selected, onSelect, onConfir
             <button
               key={m.id}
               onClick={() => onSelect(m.id)}
-              className={`flex items-center gap-3 p-3 rounded-xl border transition ${
+              className={`flex items-center justify-center p-3 rounded-xl border transition ${
                 selected === m.id ? "border-brand ring-2 ring-brand bg-slate-50" : "border-slate-200 hover:bg-slate-50"
               }`}
             >
-              {ICONS[m.id]}
-              <span className="font-semibold text-slate-800 text-sm">{m.name}</span>
+              {m.logo ? (
+                <img src={m.logo} alt={m.name} className="h-8 w-auto max-w-[120px] object-contain" />
+              ) : (
+                m.mark
+              )}
             </button>
           ))}
         </div>
