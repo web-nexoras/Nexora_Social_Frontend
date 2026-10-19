@@ -33,65 +33,66 @@ function SubscriberCard({ s, onAction, busy }) {
   const active = s.status === "active";
   const expired = !!s.isExpired;
   return (
-    <div className="bg-white rounded-2xl shadow p-5">
-      <div className="flex items-start gap-4">
+    <div className="bg-white rounded-2xl shadow p-4 sm:p-5">
+      {/* Top row: avatar + name + badge */}
+      <div className="flex items-center gap-3">
         <img
           src={s.user?.avatar || "https://via.placeholder.com/48"}
           alt={s.user?.fullname || "Subscriber"}
-          className="w-12 h-12 rounded-full object-cover shrink-0"
+          className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover shrink-0"
         />
         <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between gap-2">
-            <h3 className="font-bold text-slate-800 truncate">{s.user?.fullname || "Unknown user"}</h3>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <h3 className="font-bold text-slate-800 truncate text-sm sm:text-base">{s.user?.fullname || "Unknown user"}</h3>
             <StatusBadge status={s.status} />
           </div>
-          <p className="text-sm text-slate-500 truncate">{s.user?.email || "—"}</p>
-
-          <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
-            <div>
-              <p className="text-xs text-slate-400">Group</p>
-              <p className="font-medium text-slate-700 truncate">{s.group?.name || "—"}</p>
-            </div>
-            <div>
-              <p className="text-xs text-slate-400">Amount</p>
-              <p className="font-medium text-slate-700">
-                {s.amount} {s.currency}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-slate-400">Paid on</p>
-              <p className="font-medium text-slate-700">{fmtDate(s.paidAt || s.createdAt)}</p>
-            </div>
-            {active && (
-              <div>
-                <p className="text-xs text-slate-400">Expires (6 months)</p>
-                <p className={`font-medium ${expired ? "text-red-500" : "text-green-600"}`}>
-                  {fmtDate(s.expiresAt)}
-                </p>
-              </div>
-            )}
-          </div>
-
-          {s.status === "pending" && (
-            <div className="mt-4 flex items-center gap-2">
-              <button
-                onClick={() => onAction(s._id, "approve")}
-                disabled={busy}
-                className="inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg bg-brand text-white text-xs font-semibold hover:bg-slate-700 transition disabled:opacity-60"
-              >
-                <FiCheck /> Approve
-              </button>
-              <button
-                onClick={() => onAction(s._id, "reject")}
-                disabled={busy}
-                className="inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg bg-red-50 text-red-600 text-xs font-semibold hover:bg-red-100 transition disabled:opacity-60"
-              >
-                <FiX /> Reject
-              </button>
-            </div>
-          )}
+          <p className="text-xs sm:text-sm text-slate-500 truncate">{s.user?.email || "—"}</p>
         </div>
       </div>
+
+      {/* Info grid */}
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:gap-3 text-sm">
+        <div>
+          <p className="text-xs text-slate-400">Group</p>
+          <p className="font-medium text-slate-700 truncate text-xs sm:text-sm">{s.group?.name || "—"}</p>
+        </div>
+        <div>
+          <p className="text-xs text-slate-400">Amount</p>
+          <p className="font-medium text-slate-700 text-xs sm:text-sm">{s.amount} {s.currency}</p>
+        </div>
+        <div>
+          <p className="text-xs text-slate-400">Paid on</p>
+          <p className="font-medium text-slate-700 text-xs sm:text-sm">{fmtDate(s.paidAt || s.createdAt)}</p>
+        </div>
+        {active && (
+          <div>
+            <p className="text-xs text-slate-400">Expires</p>
+            <p className={`font-medium text-xs sm:text-sm ${expired ? "text-red-500" : "text-green-600"}`}>
+              {fmtDate(s.expiresAt)}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Approve / Reject buttons */}
+      {s.status === "pending" && (
+        <div className="mt-4 flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => onAction(s._id, "approve")}
+            disabled={busy}
+            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg bg-brand text-white text-xs font-semibold hover:bg-slate-700 transition disabled:opacity-60"
+          >
+            <FiCheck /> Approve
+          </button>
+          <button
+            onClick={() => onAction(s._id, "reject")}
+            disabled={busy}
+            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg bg-red-50 text-red-600 text-xs font-semibold hover:bg-red-100 transition disabled:opacity-60"
+          >
+            <FiX /> Reject
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -102,19 +103,20 @@ function MySubscriptionCard({ s, onAction, busy }) {
   const rejectedByAdmin = s.status === "cancelled" && s.cancelledBy === "admin";
   const left = daysLeft(s.expiresAt);
   return (
-    <div className="bg-white rounded-2xl shadow p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="text-lg font-bold text-slate-800 truncate">{s.group?.name}</h3>
-          <p className="text-sm text-slate-500 truncate">{s.group?.description}</p>
+    <div className="bg-white rounded-2xl shadow p-4 sm:p-5">
+      {/* Top row */}
+      <div className="flex items-start justify-between gap-2 flex-wrap">
+        <div className="min-w-0 flex-1">
+          <h3 className="text-base sm:text-lg font-bold text-slate-800 truncate">{s.group?.name}</h3>
+          <p className="text-xs sm:text-sm text-slate-500 truncate">{s.group?.description}</p>
         </div>
         <StatusBadge status={s.status} />
       </div>
 
-      {/* Admin rejected this request — subscriber decides when to clear it */}
+      {/* Admin rejected notice */}
       {rejectedByAdmin && (
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-red-50 px-3.5 py-3">
-          <p className="text-sm font-semibold text-red-600">Your subscription was cancelled by admin</p>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-red-50 px-3 py-2.5">
+          <p className="text-xs sm:text-sm font-semibold text-red-600">Cancelled by admin</p>
           <button
             onClick={() => onAction(s._id, "removeMine")}
             disabled={busy}
@@ -125,21 +127,20 @@ function MySubscriptionCard({ s, onAction, busy }) {
         </div>
       )}
 
-      <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+      {/* Info grid */}
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:gap-3 text-sm">
         <div>
           <p className="text-xs text-slate-400">Amount</p>
-          <p className="font-medium text-slate-700">
-            {s.amount} {s.currency}
-          </p>
+          <p className="font-medium text-slate-700 text-xs sm:text-sm">{s.amount} {s.currency}</p>
         </div>
         <div>
           <p className="text-xs text-slate-400">Paid on</p>
-          <p className="font-medium text-slate-700">{fmtDate(s.paidAt || s.createdAt)}</p>
+          <p className="font-medium text-slate-700 text-xs sm:text-sm">{fmtDate(s.paidAt || s.createdAt)}</p>
         </div>
         {active && (
           <div className="col-span-2">
             <p className="text-xs text-slate-400">Expires (6 months)</p>
-            <p className="text-base font-bold text-green-600">{fmtDate(s.expiresAt)}</p>
+            <p className="text-sm sm:text-base font-bold text-green-600">{fmtDate(s.expiresAt)}</p>
             {left !== null && (
               <p className="inline-flex items-center gap-1 text-xs text-slate-400 mt-0.5">
                 <FiClock /> {left > 0 ? `${left} days left` : "expired"}
@@ -151,6 +152,7 @@ function MySubscriptionCard({ s, onAction, busy }) {
     </div>
   );
 }
+
 
 export default function PaymentHistory() {
   const { user } = useAuth();
@@ -245,8 +247,6 @@ export default function PaymentHistory() {
   return (
     <div className="mt-6 space-y-10">
       <section>
-        <h1 className="text-3xl font-bold text-brand mb-6">My Subscriptions</h1>
-        {subs.length === 0 && <p className="text-slate-500">No subscriptions yet.</p>}
         <div className="grid gap-4 md:grid-cols-2">
           {subs.map((s) => (
             <MySubscriptionCard key={s._id} s={s} onAction={handleAction} busy={busyId === s._id} />
