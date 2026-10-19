@@ -4,7 +4,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { usersApi } from "../api/usersApi";
 import { friendsApi } from "../api/friendsApi";
 import { useToast } from "../context/ToastContext";
-import LoadingState from "../components/LoadingState";
+import InlineLoader from "../components/InlineLoader";
 
 export default function UserProfile() {
   const { id } = useParams();
@@ -53,7 +53,7 @@ export default function UserProfile() {
   };
 
   if (loading) {
-    return <LoadingState label="Loading profile..." />;
+    return <InlineLoader label="Loading profile..." />;
   }
 
   if (!user) {

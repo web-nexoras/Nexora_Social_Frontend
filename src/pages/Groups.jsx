@@ -3,7 +3,7 @@ import { FiCheck } from "react-icons/fi";
 import { Link, useNavigate } from "react-router-dom";
 import { groupsApi } from "../api/groupsApi";
 import { useAuth } from "../context/AuthContext";
-import LoadingState from "../components/LoadingState";
+import InlineLoader from "../components/InlineLoader";
 
 export default function Groups() {
   const { user } = useAuth();
@@ -38,7 +38,7 @@ export default function Groups() {
     navigate(`/chat?conversation=${convId}`);
   };
 
-  if (loading) return <LoadingState label="Loading groups..." />;
+  if (loading) return <InlineLoader label="Loading groups..." />;
 
   return (
     <div className="mt-6">

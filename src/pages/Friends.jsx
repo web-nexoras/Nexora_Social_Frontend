@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { friendsApi } from "../api/friendsApi";
 import { useToast } from "../context/ToastContext";
-import LoadingState from "../components/LoadingState";
+import InlineLoader from "../components/InlineLoader";
 
 const TABS = ["Suggestions", "Incoming", "Sent", "Friends"];
 
@@ -91,7 +91,7 @@ export default function Friends() {
     }
   };
 
-  if (loading) return <LoadingState label="Loading friends..." />;
+  if (loading) return <InlineLoader label="Loading friends..." />;
 
   return (
     <div className="grid md:grid-cols-4 gap-6 mt-6">
