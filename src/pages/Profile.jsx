@@ -69,7 +69,7 @@ export default function Profile() {
     <div className="max-w-3xl mx-auto mt-6 px-4 sm:px-0">
       <div className="bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden">
         {/* Dark Cover banner — clean monochrome gradient */}
-        <div className="relative h-40 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-700 overflow-hidden">
+        <div className="relative h-36 sm:h-40 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-700 overflow-hidden">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-white/15 via-transparent to-transparent"></div>
           <div className="absolute -bottom-24 -right-10 w-80 h-80 rounded-full bg-white/5 blur-3xl"></div>
           <div className="absolute top-4 right-4 flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/10 px-3 py-1 rounded-full text-xs font-semibold text-slate-200">
@@ -79,10 +79,10 @@ export default function Profile() {
         </div>
 
         {/* Profile Content */}
-        <div className="px-6 sm:px-8 pb-8">
+        <div className="px-4 sm:px-6 md:px-8 pb-6 sm:pb-8">
           <div className="-mt-14 mb-6">
             {/* Avatar container with photo upload overlay — z-10 so it paints over the banner */}
-            <div className="relative z-10 w-28 h-28 rounded-full border-4 border-white shadow-2xl overflow-hidden bg-slate-900 shrink-0 group">
+            <div className="relative z-10 w-24 h-24 sm:w-28 sm:h-28 rounded-full border-4 border-white shadow-2xl overflow-hidden bg-slate-900 shrink-0 group">
               {preview && !imgError ? (
                 <img
                   src={preview}
@@ -91,7 +91,7 @@ export default function Profile() {
                   className="w-full h-full object-cover"
                 />
               ) : (
-                <div className="w-full h-full bg-gradient-to-br from-slate-600 via-slate-700 to-slate-900 flex items-center justify-center text-white text-2xl font-black tracking-wider">
+                <div className="w-full h-full bg-gradient-to-br from-slate-600 via-slate-700 to-slate-900 flex items-center justify-center text-white text-xl sm:text-2xl font-black tracking-wider">
                   {initials}
                 </div>
               )}
@@ -103,7 +103,7 @@ export default function Profile() {
             </div>
 
             <div className="mt-3">
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">{user.fullname}</h1>
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight break-words">{user.fullname}</h1>
               <p className="text-sm text-slate-500 flex items-center gap-1.5 mt-0.5">
                 <FiMail className="text-slate-400" /> {user.email}
               </p>
