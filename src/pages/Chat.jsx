@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useSocket } from "../context/SocketContext";
 import { chatApi } from "../api/chatApi";
 import { groupsApi, paymentsApi } from "../api/groupsApi";
 import { usersApi } from "../api/usersApi";
 import PaymentMethodModal from "../components/PaymentMethodModal";
-import { io } from "socket.io-client";
 import {
   FiBell,
   FiLock,
@@ -17,10 +17,6 @@ import {
   FiMoreVertical,
   FiArrowLeft,
 } from "react-icons/fi";
-
-const SOCKET_URL =
-  import.meta.env.VITE_API_URL?.replace("/api/v1", "") ||
-  "http://localhost:5000";
 
 export default function Chat() {
   const [searchParams] = useSearchParams();
@@ -37,8 +33,10 @@ export default function Chat() {
   const [mobileView, setMobileView] = useState("list");
   const [highlighted, setHighlighted] = useState(new Set());
   const [unreadIds, setUnreadIds] = useState(new Set());
-  const [toast, setToast] = useState("");
-  const [lockedGroup, setLockedGroup] = useState(null);
+  const { socket, onlineIds, showToast } = useSocket();
+
+  const activeIdRef = useRef(null);
+  const bottomRef = useRef(null);
   const [showSubscribe, setShowSubscribe] = useState(false);
   const [subscribing, setSubscribing] = useState(false);
   const [subscribeMsg, setSubscribeMsg] = useState("");
@@ -55,30 +53,9 @@ export default function Chat() {
   const [paying, setPaying] = useState(false);
   const [payMsg, setPayMsg] = useState("");
   const [payDone, setPayDone] = useState(false);
-  const [onlineIds, setOnlineIds] = useState(() => new Set());
   const [menuConvId, setMenuConvId] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [editText, setEditText] = useState("");
-  const socketRef = useRef(null);
-  const activeIdRef = useRef(null);
-  const bottomRef = useRef(null);
-
-  const playNotificationSound = () => {
-    try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = "sine";
-      osc.frequency.value = 880;
-      gain.gain.value = 0.1;
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.15);
-    } catch (e) {
-      console.error("Sound error:", e);
-    }
-  };
 
   const loadConversations = async () => {
     const res = await chatApi.conversations();
@@ -108,8 +85,7 @@ export default function Chat() {
         });
       } catch (e) {
         const msg = e?.response?.data?.message || "Could not open chat";
-        setToast(msg);
-        setTimeout(() => setToast(""), 3000);
+        showToast(msg);
       }
     };
     init();
@@ -188,24 +164,26 @@ export default function Chat() {
 
   // ONE persistent socket for the whole chat session — switching conversations
   // never disconnects/reconnects (instant presence + instant messages)
+  // Attach message handlers to the shared global socket (no reconnect on switch)
   useEffect(() => {
-    const token = localStorage.getItem("accTkn");
-    const socket = io(SOCKET_URL, {
-      withCredentials: true,
-      auth: token && token !== "undefined" ? { token } : {},
-    });
-    socketRef.current = socket;
+    if (!socket) return;
 
-    socket.on("message:new", (msg) => {
+    const onMessageNew = (msg) => {
       const convId = msg.conversation?._id || msg.conversation;
-      const senderId = msg.sender?._id || msg.sender;
-      const isMine = senderId === user?._id;
       const isActiveConv = convId === activeIdRef.current;
 
       if (isActiveConv) {
         setMessages((prev) =>
           prev.some((m) => m._id === msg._id) ? prev : [...prev, msg],
         );
+        setHighlighted((prev) => new Set(prev).add(msg._id));
+        setTimeout(() => {
+          setHighlighted((prev) => {
+            const next = new Set(prev);
+            next.delete(msg._id);
+            return next;
+          });
+        }, 3000);
       } else {
         setUnreadIds((prev) => new Set(prev).add(convId));
       }
@@ -226,30 +204,14 @@ export default function Chat() {
             new Date(b.lastMessageAt || 0) - new Date(a.lastMessageAt || 0),
         );
       });
+    };
 
-      if (!isMine) {
-        playNotificationSound();
-        setToast(`New message from ${msg.sender?.fullname || "Someone"}`);
-        setTimeout(() => setToast(""), 3000);
-        if (isActiveConv) {
-          setHighlighted((prev) => new Set(prev).add(msg._id));
-          setTimeout(() => {
-            setHighlighted((prev) => {
-              const next = new Set(prev);
-              next.delete(msg._id);
-              return next;
-            });
-          }, 3000);
-        }
-      }
-    });
-
-    socket.on("message:deleted", ({ messageId }) => {
+    const onMessageDeleted = ({ messageId }) => {
       setMessages((prev) => prev.filter((m) => m._id !== messageId));
-    });
+    };
 
     // A conversation was deleted (by admin or a participant) — drop it from the list
-    socket.on("conversation:deleted", ({ conversationId }) => {
+    const onConversationDeleted = ({ conversationId }) => {
       setConversations((prev) => prev.filter((c) => c._id !== conversationId));
       setUnreadIds((prev) => {
         const next = new Set(prev);
@@ -261,25 +223,10 @@ export default function Chat() {
         setMessages([]);
         setMobileView("list");
       }
-    });
-
-    // Presence — who is currently online (for the green "Active" indicator)
-    socket.on("presence:list", ({ onlineUserIds }) => {
-      setOnlineIds(new Set(onlineUserIds || []));
-    });
-    socket.on("user:online", ({ userId }) => {
-      setOnlineIds((prev) => new Set(prev).add(userId));
-    });
-    socket.on("user:offline", ({ userId }) => {
-      setOnlineIds((prev) => {
-        const next = new Set(prev);
-        next.delete(userId);
-        return next;
-      });
-    });
+    };
 
     // A message was edited by its author (or an admin)
-    socket.on("message:updated", ({ message }) => {
+    const onMessageUpdated = ({ message }) => {
       setMessages((prev) =>
         prev.map((m) =>
           m._id === message._id
@@ -287,17 +234,27 @@ export default function Chat() {
             : m,
         ),
       );
-    });
+    };
 
-    return () => socket.disconnect();
-  }, []);
+    socket.on("message:new", onMessageNew);
+    socket.on("message:deleted", onMessageDeleted);
+    socket.on("conversation:deleted", onConversationDeleted);
+    socket.on("message:updated", onMessageUpdated);
+
+    return () => {
+      socket.off("message:new", onMessageNew);
+      socket.off("message:deleted", onMessageDeleted);
+      socket.off("conversation:deleted", onConversationDeleted);
+      socket.off("message:updated", onMessageUpdated);
+    };
+  }, [socket]);
 
   // Join the open conversation's room (socket already alive — instant)
   useEffect(() => {
-    if (activeId && socketRef.current) {
-      socketRef.current.emit("chat:join", { conversationId: activeId });
+    if (activeId && socket) {
+      socket.emit("chat:join", { conversationId: activeId });
     }
-  }, [activeId]);
+  }, [activeId, socket]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -436,12 +393,10 @@ export default function Chat() {
         setMessages([]);
         setMobileView("list");
       }
-      setToast("Conversation deleted");
-      setTimeout(() => setToast(""), 2500);
+      showToast("Conversation deleted");
     } catch (e) {
       console.error(e);
-      setToast(e?.response?.data?.message || "Failed to delete conversation");
-      setTimeout(() => setToast(""), 2500);
+      showToast(e?.response?.data?.message || "Failed to delete conversation");
     }
   };
 
@@ -513,12 +468,6 @@ export default function Chat() {
 
   return (
     <div className="max-w-6xl mx-auto mt-6">
-      {toast && (
-        <div className="fixed top-20 right-4 z-50 bg-slate-900 border border-slate-700 shadow-lg rounded-xl px-4 py-3 text-sm text-white flex items-center gap-2">
-          <FiBell className="shrink-0" /> {toast}
-        </div>
-      )}
-
       {lockedGroup && showSubscribe && (
         <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl neo-modal max-w-md w-full p-6">
