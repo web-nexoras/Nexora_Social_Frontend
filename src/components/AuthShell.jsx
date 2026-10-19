@@ -3,8 +3,8 @@ import { Link } from "react-router-dom";
 
 export default function AuthShell({ title, subtitle, children, footer }) {
   return (
-    <div className="min-h-screen neo-surface flex items-start justify-center overflow-y-auto p-4 py-6 sm:items-center">
-      <div className="w-full max-w-md neo-raised rounded-3xl p-6 sm:p-8">
+    <main className="min-h-screen min-h-[100dvh] neo-surface flex items-center justify-center overflow-x-hidden overflow-y-auto px-3 py-5 sm:px-5 sm:py-8">
+      <section className="my-auto w-full min-w-0 max-w-md neo-raised rounded-3xl p-5 sm:p-8">
         <div className="flex flex-col items-center mb-6">
           {/* <div className="w-16 h-16 rounded-2xl neo-raised-sm flex items-center justify-center text-3xl">
             🌐
@@ -18,8 +18,8 @@ export default function AuthShell({ title, subtitle, children, footer }) {
         {children}
 
         {footer && <div className="mt-6 text-center text-sm text-slate-500">{footer}</div>}
-      </div>
-    </div>
+      </section>
+    </main>
   );
 }
 

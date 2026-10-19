@@ -16,7 +16,7 @@ export default function AuthCallback() {
 
   useEffect(() => {
     const auth0Configured = Boolean(
-      import.meta.env.VITE_AUTH0_DOMAIN && import.meta.env.VITE_AUTH0_CLIENT_ID,
+      import.meta.env.VITE_AUTH0_DOMAIN?.trim() && import.meta.env.VITE_AUTH0_CLIENT_ID?.trim(),
     );
     if (!auth0Configured) {
       navigate("/signin", { replace: true });

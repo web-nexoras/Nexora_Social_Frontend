@@ -10,7 +10,7 @@ export default function Login() {
   const { login } = useAuth();
   const { loginWithRedirect, isLoading: auth0Loading } = useAuth0();
   const auth0Configured = Boolean(
-    import.meta.env.VITE_AUTH0_DOMAIN && import.meta.env.VITE_AUTH0_CLIENT_ID,
+    import.meta.env.VITE_AUTH0_DOMAIN?.trim() && import.meta.env.VITE_AUTH0_CLIENT_ID?.trim(),
   );
   const { showToast } = useToast();
   const navigate = useNavigate();
@@ -79,6 +79,19 @@ export default function Login() {
 
   const startSocialLogin = async (connection) => {
     setGeneralError("");
+    if (!auth0Configured) {
+      const message = "Social sign-in is not configured for this app. Add the Auth0 domain and client ID, then restart or redeploy.";
+      setGeneralError(message);
+      showToast(message, "error");
+      return;
+    }
+    if (auth0Loading) {
+      const message = "Social sign-in is still initializing. Please try again in a moment.";
+      setGeneralError(message);
+      showToast(message, "info");
+      return;
+    }
+
     setSocialLoading(true);
     try {
       await loginWithRedirect({ authorizationParams: { connection } });
@@ -167,7 +180,8 @@ export default function Login() {
         <div className="grid grid-cols-2 gap-3">
           <button
             type="button"
-            disabled={!auth0Configured || auth0Loading || socialLoading}
+            disabled={socialLoading}
+            aria-busy={socialLoading}
             onClick={() => startSocialLogin("google-oauth2")}
             className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-semibold hover:bg-slate-50 transition disabled:opacity-60"
           >
@@ -176,7 +190,8 @@ export default function Login() {
           </button>
           <button
             type="button"
-            disabled={!auth0Configured || auth0Loading || socialLoading}
+            disabled={socialLoading}
+            aria-busy={socialLoading}
             onClick={() => startSocialLogin("github")}
             className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-semibold hover:bg-slate-50 transition disabled:opacity-60"
           >

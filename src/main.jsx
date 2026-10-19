@@ -5,8 +5,14 @@ import "./index.css";
 
 import { Auth0Context, Auth0Provider, initialContext } from "@auth0/auth0-react";
 
-const auth0Domain = import.meta.env.VITE_AUTH0_DOMAIN;
-const auth0ClientId = import.meta.env.VITE_AUTH0_CLIENT_ID;
+// Auth0 expects a bare domain (without protocol or trailing slash). Normalize
+// common dashboard/env formats so a harmless formatting difference cannot
+// crash provider initialization on any device.
+const auth0Domain = (import.meta.env.VITE_AUTH0_DOMAIN || "")
+  .trim()
+  .replace(/^https?:\/\//i, "")
+  .replace(/\/+$/, "");
+const auth0ClientId = (import.meta.env.VITE_AUTH0_CLIENT_ID || "").trim();
 const auth0Configured = Boolean(auth0Domain && auth0ClientId);
 const app = <App />;
 

@@ -4,13 +4,10 @@ const configuredApiUrl =
 const isLoopback = (hostname) =>
   ["localhost", "127.0.0.1", "::1"].includes(hostname.toLowerCase());
 
-export const USE_DEV_API_PROXY = (() => {
-  try {
-    return import.meta.env.DEV && isLoopback(new URL(configuredApiUrl).hostname);
-  } catch {
-    return false;
-  }
-})();
+// Keep browser requests same-origin in development. This lets desktop and
+// phone browsers use the Vite proxy even when the API is hosted remotely and
+// does not allow the phone's changing LAN origin in CORS.
+export const USE_DEV_API_PROXY = Boolean(import.meta.env.DEV);
 
 function resolveApiBaseUrl() {
   try {
