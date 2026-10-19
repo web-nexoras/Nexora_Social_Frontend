@@ -3,6 +3,7 @@ import { paymentsApi } from "../api/groupsApi";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { FiCheck, FiX, FiUsers, FiClock, FiCreditCard, FiTrash2 } from "react-icons/fi";
+import LoadingState from "../components/LoadingState";
 
 const fmtDate = (d) => (d ? new Date(d).toLocaleDateString() : "—");
 
@@ -247,7 +248,7 @@ export default function PaymentHistory() {
   const activeCount = dedupedSubs.filter((s) => s.status === "active" && !s.isExpired).length;
   const pendingCount = dedupedSubs.filter((s) => s.status === "pending").length;
 
-  if (loading) return <p className="text-center mt-10">Loading...</p>;
+  if (loading) return <LoadingState label="Loading payments..." />;
 
   return (
     <div className="mt-6 space-y-10">
@@ -285,7 +286,7 @@ export default function PaymentHistory() {
             </div>
           </div>
 
-          {allLoading && <p className="text-slate-400">Loading subscribers...</p>}
+          {allLoading && <LoadingState label="Loading subscribers..." compact />}
           {!allLoading && dedupedSubs.length === 0 && (
             <p className="text-slate-500">No subscribers yet.</p>
           )}

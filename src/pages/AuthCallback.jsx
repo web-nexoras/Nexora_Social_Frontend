@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import AuthShell from "../components/AuthShell";
+import LoadingState from "../components/LoadingState";
 
 export default function AuthCallback() {
   const { isAuthenticated, getIdTokenClaims, isLoading, error } = useAuth0();
@@ -18,7 +19,7 @@ export default function AuthCallback() {
       import.meta.env.VITE_AUTH0_DOMAIN && import.meta.env.VITE_AUTH0_CLIENT_ID,
     );
     if (!auth0Configured) {
-      navigate("/login", { replace: true });
+      navigate("/signin", { replace: true });
       return;
     }
 
@@ -27,13 +28,13 @@ export default function AuthCallback() {
     if (error) {
       setStatus("Auth0 error: " + error.message);
       showToast("Auth0 login failed: " + error.message, "error");
-      const t = setTimeout(() => navigate("/login"), 3000);
+      const t = setTimeout(() => navigate("/signin"), 3000);
       return () => clearTimeout(t);
     }
 
     if (!isAuthenticated) {
       // Not authenticated and not loading — redirect to login
-      navigate("/login", { replace: true });
+      navigate("/signin", { replace: true });
       return;
     }
 
@@ -56,7 +57,7 @@ export default function AuthCallback() {
         if (data?.pending) {
           setStatus("Account created. Pending admin approval.");
           showToast("Account created. Pending admin approval.", "info", 6000);
-          setTimeout(() => navigate("/login"), 3000);
+          setTimeout(() => navigate("/signin"), 3000);
         } else {
           showToast("Signed in successfully! Welcome back.", "success");
           navigate("/dashboard");
@@ -70,7 +71,7 @@ export default function AuthCallback() {
         const isPending = err?.response?.data?.pending;
         setStatus(msg);
         showToast(msg, isPending ? "info" : "error", 6000);
-        setTimeout(() => navigate("/login"), 3000);
+        setTimeout(() => navigate("/signin"), 3000);
       }
     })();
 
@@ -79,9 +80,7 @@ export default function AuthCallback() {
 
   return (
     <AuthShell title="Signing in..." subtitle={status}>
-      <div className="flex items-center justify-center py-8">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-brand"></div>
-      </div>
+      <LoadingState label={status} compact />
     </AuthShell>
   );
 }

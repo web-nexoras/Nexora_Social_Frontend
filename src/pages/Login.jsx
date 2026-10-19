@@ -161,16 +161,13 @@ export default function Login() {
           {loading ? "Signing in..." : "Sign In"}
         </button>
 
-        {/* Social login is unavailable until Auth0 is configured. */}
-        {auth0Configured && (
-          <>
-            <div className="flex justify-center text-xs my-2">
-              <span className="text-slate-400">or continue with</span>
-            </div>
+        <div className="flex justify-center text-xs my-2">
+          <span className="text-slate-400">or continue with</span>
+        </div>
         <div className="grid grid-cols-2 gap-3">
           <button
             type="button"
-            disabled={auth0Loading || socialLoading}
+            disabled={!auth0Configured || auth0Loading || socialLoading}
             onClick={() => startSocialLogin("google-oauth2")}
             className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-semibold hover:bg-slate-50 transition disabled:opacity-60"
           >
@@ -179,7 +176,7 @@ export default function Login() {
           </button>
           <button
             type="button"
-            disabled={auth0Loading || socialLoading}
+            disabled={!auth0Configured || auth0Loading || socialLoading}
             onClick={() => startSocialLogin("github")}
             className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-semibold hover:bg-slate-50 transition disabled:opacity-60"
           >
@@ -187,7 +184,10 @@ export default function Login() {
             GitHub
           </button>
         </div>
-          </>
+        {!auth0Configured && (
+          <p className="text-center text-xs text-slate-500" role="status">
+            Social sign-in is unavailable on this deployment until Auth0 is configured.
+          </p>
         )}
       </form>
     </AuthShell>

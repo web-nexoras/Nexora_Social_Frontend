@@ -3,6 +3,7 @@ import { usersApi } from "../api/usersApi";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { FiCheck, FiX } from "react-icons/fi";
+import LoadingState from "../components/LoadingState";
 
 export default function AdminUsers() {
   const { user } = useAuth();
@@ -105,7 +106,7 @@ export default function AdminUsers() {
         ))}
       </div>
 
-      {loading && <p className="text-center text-slate-400">Loading...</p>}
+      {loading && <LoadingState label="Loading users..." compact />}
 
       <div className="bg-white rounded-2xl shadow overflow-x-auto">
         <table className="w-full text-sm min-w-[640px]">

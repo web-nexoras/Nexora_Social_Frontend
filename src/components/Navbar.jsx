@@ -13,7 +13,7 @@ export default function Navbar() {
   const handleLogout = async () => {
     await logout();
     setOpen(false);
-    navigate("/login");
+    navigate("/signin");
   };
 
   const handleSearch = (e) => {
@@ -79,8 +79,8 @@ export default function Navbar() {
             </>
           ) : (
             <>
-              <Link to="/login" className="text-slate-700 hover:text-brand">Login</Link>
-              <Link to="/signup" className="px-4 py-1.5 rounded-lg bg-brand text-white hover:bg-indigo-700 transition">Signup</Link>
+              <Link to="/signin" className="text-slate-700 hover:text-brand">Sign In</Link>
+              <Link to="/signup" className="px-4 py-1.5 rounded-lg bg-brand text-white hover:bg-indigo-700 transition">Sign Up</Link>
             </>
           )}
         </div>

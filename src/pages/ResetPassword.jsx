@@ -37,7 +37,7 @@ export default function ResetPassword() {
     try {
       const res = await authApi.resetPassword(token, email, password);
       setMsg(res.data?.message || "Password reset successfully");
-      setTimeout(() => navigate("/login"), 1500);
+      setTimeout(() => navigate("/signin"), 1500);
     } catch (err) {
       setError(err?.response?.data?.message || "Reset failed");
     } finally {
@@ -50,7 +50,7 @@ export default function ResetPassword() {
       title="Reset Password"
       subtitle="Set a new password for your Nexora Social account."
       footer={
-        <Link to="/login" className="inline-flex items-center gap-1 text-brand font-semibold hover:underline">
+        <Link to="/signin" className="inline-flex items-center gap-1 text-brand font-semibold hover:underline">
           <FiArrowLeft /> Back to Sign In
         </Link>
       }

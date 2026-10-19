@@ -35,7 +35,7 @@ export default function VerifyOtp() {
       await verifyOtp(email, otp);
       setMsg("Email verified successfully! Your account is now pending admin approval. You can log in once an admin approves your account.");
       showToast("Email verified! Account pending admin approval.", "success", 6000);
-      setTimeout(() => navigate("/login"), 1500);
+      setTimeout(() => navigate("/signin"), 1500);
     } catch (err) {
       const errMsg = err?.response?.data?.message || "OTP verification failed. Check the code and try again.";
       setError(errMsg);
@@ -69,7 +69,7 @@ export default function VerifyOtp() {
       subtitle="Enter the 6-digit code we sent to your email to activate your account."
       footer={
         msg ? (
-          <Link to="/login" className="inline-flex items-center gap-1.5 text-brand font-semibold hover:underline">
+          <Link to="/signin" className="inline-flex items-center gap-1.5 text-brand font-semibold hover:underline">
             Go to Sign In <FiArrowRight />
           </Link>
         ) : (

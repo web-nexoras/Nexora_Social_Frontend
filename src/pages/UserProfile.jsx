@@ -4,6 +4,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { usersApi } from "../api/usersApi";
 import { friendsApi } from "../api/friendsApi";
 import { useToast } from "../context/ToastContext";
+import LoadingState from "../components/LoadingState";
 
 export default function UserProfile() {
   const { id } = useParams();
@@ -52,11 +53,7 @@ export default function UserProfile() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[300px]">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-brand"></div>
-      </div>
-    );
+    return <LoadingState label="Loading profile..." />;
   }
 
   if (!user) {

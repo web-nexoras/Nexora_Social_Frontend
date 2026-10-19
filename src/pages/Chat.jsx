@@ -7,6 +7,7 @@ import { chatApi } from "../api/chatApi";
 import { groupsApi, paymentsApi } from "../api/groupsApi";
 import { usersApi } from "../api/usersApi";
 import PaymentMethodModal from "../components/PaymentMethodModal";
+import LoadingState from "../components/LoadingState";
 import {
   FiBell,
   FiLock,
@@ -815,9 +816,7 @@ export default function Chat() {
             )}
           </div>
           <div ref={messagesContainerRef} className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 space-y-4">
-            {loading && (
-              <p className="text-center text-slate-400">Loading...</p>
-            )}
+            {loading && <LoadingState label="Loading messages..." compact />}
             {grouped.map((group, gi) => {
               const senderId = group.sender?._id || group.sender;
               const isMe = senderId === user?._id;

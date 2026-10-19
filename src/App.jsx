@@ -7,6 +7,7 @@ import { ToastProvider } from "./context/ToastContext";
 import PublicLayout from "./components/PublicLayout";
 import DashboardShell from "./components/DashboardShell";
 import ProtectedRoute from "./components/ProtectedRoute";
+import LoadingState from "./components/LoadingState";
 
 const Home = lazy(() => import("./pages/Home"));
 const Login = lazy(() => import("./pages/Login"));
@@ -74,16 +75,12 @@ export default function App() {
               <RouteErrorBoundary>
                 <Suspense
                   fallback={
-                    <div
-                      className="flex min-h-[40vh] items-center justify-center"
-                      role="status"
-                    >
-                      Loading page...
-                    </div>
+                    <LoadingState label="Opening page..." />
                   }
                 >
                   <Routes>
                     {/* Auth pages — clean, full screen, no navbar */}
+                    <Route path="/signin" element={<Login />} />
                     <Route path="/login" element={<Login />} />
                     <Route path="/signup" element={<Signup />} />
                     <Route path="/verify-otp" element={<VerifyOtp />} />

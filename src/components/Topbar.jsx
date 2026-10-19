@@ -20,7 +20,7 @@ export default function Topbar({ onMenuClick }) {
   const handleLogout = async () => {
     await logout();
     setOpen(false);
-    navigate("/login");
+    navigate("/signin");
   };
 
   // Live search while typing (debounced)
