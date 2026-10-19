@@ -34,6 +34,7 @@ export default function Chat() {
   const [highlighted, setHighlighted] = useState(new Set());
   const [unreadIds, setUnreadIds] = useState(new Set());
   const { socket, onlineIds, showToast } = useSocket();
+  const [lockedGroup, setLockedGroup] = useState(null);
 
   const activeIdRef = useRef(null);
   const bottomRef = useRef(null);
