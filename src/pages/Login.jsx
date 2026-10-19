@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 import { useAuth0 } from "@auth0/auth0-react";
 import { useToast } from "../context/ToastContext";
 import AuthShell from "../components/AuthShell";
