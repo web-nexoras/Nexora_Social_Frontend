@@ -69,7 +69,7 @@ export default function UserProfile() {
   }
 
   const rel = relationship || {};
-  const canMessage = rel.isFriend || user.role === "admin" || isSelf;
+  const canMessage = (rel.isFriend || user.role === "admin") && !isSelf;
   const initials = (user.fullname || "User")
     .split(" ")
     .map((w) => w[0])

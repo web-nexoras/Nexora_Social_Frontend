@@ -95,7 +95,7 @@ export default function Chat() {
   }, [convParam]);
 
   useEffect(() => {
-    if (!targetUserId) return;
+    if (!targetUserId || targetUserId === user?._id) return;
     const init = async () => {
       try {
         const res = await chatApi.createDirect(targetUserId);
@@ -107,7 +107,9 @@ export default function Chat() {
           return [conv, ...prev];
         });
       } catch (e) {
-        console.error(e);
+        const msg = e?.response?.data?.message || "Could not open chat";
+        setToast(msg);
+        setTimeout(() => setToast(""), 3000);
       }
     };
     init();
