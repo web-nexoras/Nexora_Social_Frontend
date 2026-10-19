@@ -50,6 +50,11 @@ export function AuthProvider({ children }) {
     return res.data;
   };
 
+  const verifyOtp = async (email, otp) => {
+    const res = await authApi.verifyOtp(email, otp);
+    return res.data;
+  };
+
   const oauthLogin = async (idToken) => {
     const res = await authApi.oauthAuth0(idToken);
     const token = res.data?.accessToken;
