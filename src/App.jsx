@@ -24,7 +24,7 @@ import AdminGroups from "./pages/AdminGroups";
 import AdminUsers from "./pages/AdminUsers";
 import PaymentHistory from "./pages/PaymentHistory";
 import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
+import AuthCallback from "./pages/AuthCallback";
 
 export default function App() {
   return (
@@ -40,7 +40,7 @@ export default function App() {
           <Route path="/verify-otp" element={<VerifyOtp />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/reset-password/:token" element={<ResetPassword />} />
+          <Route path="/auth/callback" element={<AuthCallback />} />
 
           {/* Public pages (with navbar) */}
           <Route element={<PublicLayout />}>

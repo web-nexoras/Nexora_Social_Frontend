@@ -50,8 +50,18 @@ export function AuthProvider({ children }) {
     return res.data;
   };
 
-  const verifyOtp = async (email, otp) => {
-    const res = await authApi.verifyOtp(email, otp);
+  const oauthLogin = async (idToken) => {
+    const res = await authApi.oauthAuth0(idToken);
+    const token = res.data?.accessToken;
+    if (token && token !== "undefined" && token !== "null") {
+      localStorage.setItem("accTkn", token);
+    }
+    if (res.data?.user) {
+      setUser(res.data.user);
+    } else {
+      const me = await authApi.getProfile();
+      setUser(me.data?.user || me.data);
+    }
     return res.data;
   };
 
@@ -71,7 +81,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, signup, verifyOtp, logout, updateProfile }}>
+    <AuthContext.Provider value={{ user, loading, login, signup, verifyOtp, oauthLogin, logout, updateProfile }}>
       {children}
     </AuthContext.Provider>
   );
