@@ -34,12 +34,12 @@ export default function Chat() {
   const [mobileView, setMobileView] = useState("list");
   const [highlighted, setHighlighted] = useState(new Set());
   const [unreadIds, setUnreadIds] = useState(new Set());
-  const { socket, onlineIds } = useSocket();
+  const { socket, socketConnected, onlineIds } = useSocket();
   const { showToast } = useToast();
   const [lockedGroup, setLockedGroup] = useState(null);
 
   const activeIdRef = useRef(null);
-  const bottomRef = useRef(null);
+  const messagesContainerRef = useRef(null);
   const [showSubscribe, setShowSubscribe] = useState(false);
   const [subscribing, setSubscribing] = useState(false);
   const [subscribeMsg, setSubscribeMsg] = useState("");
@@ -190,11 +190,15 @@ export default function Chat() {
   useEffect(() => {
     if (!socket) return;
 
-    const onMessageNew = (msg) => {
+    const onMessageNew = (payload) => {
+      const msg = payload?.message && typeof payload.message === "object"
+        ? payload.message
+        : payload;
       if (!msg || typeof msg !== "object") return;
-      const convId = msg.conversation?._id || msg.conversation;
-      if (!convId) return;
-      const isActiveConv = convId === activeIdRef.current;
+      const conversation = msg.conversation;
+      const convId = typeof conversation === "string" ? conversation : conversation?._id;
+      if (!convId || !msg._id) return;
+      const isActiveConv = String(convId) === String(activeIdRef.current);
 
       if (isActiveConv) {
         setMessages((prev) =>
@@ -231,14 +235,17 @@ export default function Chat() {
     };
 
     const onMessageDeleted = (payload) => {
-      const messageId = payload?.messageId;
+      const messageId = payload?.messageId || payload?.message?._id || payload?._id;
       if (!messageId) return;
       setMessages((prev) => prev.filter((m) => m._id !== messageId));
     };
 
     // A conversation was deleted (by admin or a participant) — drop it from the list
     const onConversationDeleted = (payload) => {
-      const conversationId = payload?.conversationId;
+      const rawConversationId = payload?.conversationId || payload?.conversation;
+      const conversationId = typeof rawConversationId === "string"
+        ? rawConversationId
+        : rawConversationId?._id;
       if (!conversationId) return;
       setConversations((prev) => prev.filter((c) => c._id !== conversationId));
       setUnreadIds((prev) => {
@@ -255,7 +262,7 @@ export default function Chat() {
 
     // A message was edited by its author (or an admin)
     const onMessageUpdated = (payload) => {
-      const message = payload?.message;
+      const message = payload?.message || payload;
       if (!message?._id) return;
       setMessages((prev) =>
         prev.map((m) =>
@@ -287,7 +294,8 @@ export default function Chat() {
   }, [activeId, socket]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const container = messagesContainerRef.current;
+    if (container) container.scrollTop = container.scrollHeight;
   }, [messages]);
 
   // Close the conversation options (⋮) menu when clicking anywhere else
@@ -742,7 +750,7 @@ export default function Chat() {
 
         {/* Chat window */}
         <div
-          className={`bg-white rounded-2xl shadow md:col-span-2 flex flex-col h-[60vh] md:h-[70vh] ${mobileView === "list" ? "hidden md:flex" : "flex"}`}
+          className={`bg-white rounded-2xl shadow md:col-span-2 flex flex-col h-[calc(100dvh-12rem)] min-h-[14rem] md:h-[70vh] ${mobileView === "list" ? "hidden md:flex" : "flex"}`}
         >
           <div className="px-6 py-4 border-b flex items-center gap-3">
             <button
@@ -792,6 +800,11 @@ export default function Chat() {
                 {isOtherOnline ? "Active" : "Offline"}
               </span>
             )}
+            {!socketConnected && (
+              <span className="ml-auto shrink-0 text-xs font-medium text-amber-600" role="status">
+                Reconnecting…
+              </span>
+            )}
             {activeGroup && user?.role === "admin" && (
               <button
                 onClick={() => setShowAddMember(true)}
@@ -801,7 +814,7 @@ export default function Chat() {
               </button>
             )}
           </div>
-          <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          <div ref={messagesContainerRef} className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 space-y-4">
             {loading && (
               <p className="text-center text-slate-400">Loading...</p>
             )}
@@ -912,7 +925,6 @@ export default function Chat() {
                 </div>
               );
             })}
-            <div ref={bottomRef} />
           </div>
           {lockedGroup ? (
             <div className="p-4 border-t text-center">

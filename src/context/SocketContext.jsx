@@ -8,6 +8,7 @@ import { SOCKET_URL } from "../api/config";
 
 const SocketContext = createContext({
   socket: null,
+  socketConnected: false,
   onlineIds: new Set(),
   toast: null,
   showToast: () => {},
@@ -15,11 +16,27 @@ const SocketContext = createContext({
   goToChat: () => {},
 });
 
+const getSocketUserId = (payload) =>
+  typeof payload === "string"
+    ? payload
+    : payload?.userId || payload?.user?._id || payload?._id || null;
+
+const getSocketMessage = (payload) =>
+  payload?.message && typeof payload.message === "object"
+    ? payload.message
+    : payload;
+
+const getConversationId = (message) => {
+  const conversation = message?.conversation;
+  return typeof conversation === "string" ? conversation : conversation?._id || null;
+};
+
 export function SocketProvider({ children }) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const socketRef = useRef(null);
   const [socket, setSocket] = useState(null);
+  const [socketConnected, setSocketConnected] = useState(false);
   const [onlineIds, setOnlineIds] = useState(() => new Set());
   const [toast, setToast] = useState(null);
   const toastTimer = useRef(null);
@@ -28,6 +45,7 @@ export function SocketProvider({ children }) {
     // Wait until the API session is confirmed before opening a realtime socket.
     if (!user) {
       setOnlineIds(new Set());
+      setSocketConnected(false);
       return;
     }
     const token = getAuthToken();
@@ -38,17 +56,28 @@ export function SocketProvider({ children }) {
     });
     socketRef.current = s;
     setSocket(s);
+    s.on("connect", () => setSocketConnected(true));
+    s.on("disconnect", () => {
+      setSocketConnected(false);
+      setOnlineIds(new Set());
+    });
+    s.on("connect_error", () => setSocketConnected(false));
 
     s.on("presence:list", (payload) => {
-      setOnlineIds(new Set(Array.isArray(payload?.onlineUserIds) ? payload.onlineUserIds : []));
+      const ids = Array.isArray(payload)
+        ? payload
+        : Array.isArray(payload?.onlineUserIds)
+          ? payload.onlineUserIds
+          : [];
+      setOnlineIds(new Set(ids.map(getSocketUserId).filter(Boolean)));
     });
     s.on("user:online", (payload) => {
-      const userId = payload?.userId;
+      const userId = getSocketUserId(payload);
       if (!userId) return;
       setOnlineIds((prev) => new Set(prev).add(userId));
     });
     s.on("user:offline", (payload) => {
-      const userId = payload?.userId;
+      const userId = getSocketUserId(payload);
       if (!userId) return;
       setOnlineIds((prev) => {
         const next = new Set(prev);
@@ -57,10 +86,11 @@ export function SocketProvider({ children }) {
       });
     });
 
-    s.on("message:new", (msg) => {
+    s.on("message:new", (payload) => {
+      const msg = getSocketMessage(payload);
       if (!msg || typeof msg !== "object") return;
       const senderId = msg.sender?._id || msg.sender;
-      const isMine = senderId === user?._id;
+      const isMine = String(senderId) === String(user?._id);
       if (isMine) return;
 
       try {
@@ -81,7 +111,7 @@ export function SocketProvider({ children }) {
         // Audio is optional and may be blocked by mobile browser policies.
       }
 
-      const convId = msg.conversation?._id || msg.conversation;
+      const convId = getConversationId(msg);
       setToast({ convId, text: `New message from ${msg.sender?.fullname || "Someone"}` });
       if (toastTimer.current) clearTimeout(toastTimer.current);
       toastTimer.current = setTimeout(() => setToast(null), 4000);
@@ -92,6 +122,7 @@ export function SocketProvider({ children }) {
       s.disconnect();
       socketRef.current = null;
       setSocket(null);
+      setSocketConnected(false);
       setOnlineIds(new Set());
     };
   }, [user?._id]);
@@ -112,7 +143,7 @@ export function SocketProvider({ children }) {
   };
 
   return (
-    <SocketContext.Provider value={{ socket, onlineIds, toast, showToast, dismissToast, goToChat }}>
+    <SocketContext.Provider value={{ socket, socketConnected, onlineIds, toast, showToast, dismissToast, goToChat }}>
       {children}
       {toast && (
         <div
