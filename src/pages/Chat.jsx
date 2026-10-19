@@ -618,7 +618,7 @@ export default function Chat() {
       <div className="flex flex-col md:grid md:grid-cols-3 gap-6">
         {/* Conversation list */}
         <div
-          className={`bg-white rounded-2xl shadow p-4 md:col-span-1 max-h-48 md:max-h-none md:h-[70vh] overflow-y-auto ${mobileView === "chat" ? "hidden md:block" : "block"}`}
+          className={`bg-white rounded-2xl shadow p-4 md:col-span-1 max-h-64 md:max-h-none md:h-[70vh] overflow-y-auto ${mobileView === "chat" ? "hidden md:block" : "block"}`}
         >
           <h2 className="text-xl font-bold text-brand mb-4">Conversations</h2>
           {conversations.length === 0 && (
