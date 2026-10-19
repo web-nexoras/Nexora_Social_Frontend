@@ -8,26 +8,32 @@ import PublicLayout from "./components/PublicLayout";
 import DashboardShell from "./components/DashboardShell";
 import ProtectedRoute from "./components/ProtectedRoute";
 import LoadingState from "./components/LoadingState";
+import { hasShownInitialLoader, markInitialLoaderShown } from "./utils/initialLoader";
 
-const Home = lazy(() => import("./pages/Home"));
-const Login = lazy(() => import("./pages/Login"));
-const Signup = lazy(() => import("./pages/Signup"));
-const VerifyOtp = lazy(() => import("./pages/VerifyOtp"));
-const Profile = lazy(() => import("./pages/Profile"));
-const UserProfile = lazy(() => import("./pages/UserProfile"));
-const Friends = lazy(() => import("./pages/Friends"));
-const Chat = lazy(() => import("./pages/Chat"));
-const Dashboard = lazy(() => import("./pages/Dashboard"));
-const Groups = lazy(() => import("./pages/Groups"));
-const PaymentSuccess = lazy(() => import("./pages/PaymentSuccess"));
-const PaymentFail = lazy(() => import("./pages/PaymentFail"));
-const PaymentCancel = lazy(() => import("./pages/PaymentCancel"));
-const AdminGroups = lazy(() => import("./pages/AdminGroups"));
-const AdminUsers = lazy(() => import("./pages/AdminUsers"));
-const PaymentHistory = lazy(() => import("./pages/PaymentHistory"));
-const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
-const ResetPassword = lazy(() => import("./pages/ResetPassword"));
-const AuthCallback = lazy(() => import("./pages/AuthCallback"));
+const lazyPage = (loadPage) => lazy(() => loadPage().then((page) => {
+  markInitialLoaderShown();
+  return page;
+}));
+
+const Home = lazyPage(() => import("./pages/Home"));
+const Login = lazyPage(() => import("./pages/Login"));
+const Signup = lazyPage(() => import("./pages/Signup"));
+const VerifyOtp = lazyPage(() => import("./pages/VerifyOtp"));
+const Profile = lazyPage(() => import("./pages/Profile"));
+const UserProfile = lazyPage(() => import("./pages/UserProfile"));
+const Friends = lazyPage(() => import("./pages/Friends"));
+const Chat = lazyPage(() => import("./pages/Chat"));
+const Dashboard = lazyPage(() => import("./pages/Dashboard"));
+const Groups = lazyPage(() => import("./pages/Groups"));
+const PaymentSuccess = lazyPage(() => import("./pages/PaymentSuccess"));
+const PaymentFail = lazyPage(() => import("./pages/PaymentFail"));
+const PaymentCancel = lazyPage(() => import("./pages/PaymentCancel"));
+const AdminGroups = lazyPage(() => import("./pages/AdminGroups"));
+const AdminUsers = lazyPage(() => import("./pages/AdminUsers"));
+const PaymentHistory = lazyPage(() => import("./pages/PaymentHistory"));
+const ForgotPassword = lazyPage(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazyPage(() => import("./pages/ResetPassword"));
+const AuthCallback = lazyPage(() => import("./pages/AuthCallback"));
 
 class RouteErrorBoundary extends Component {
   state = { hasError: false };
@@ -74,9 +80,11 @@ export default function App() {
             <ToastProvider>
               <RouteErrorBoundary>
                 <Suspense
-                  fallback={
-                    <LoadingState label="Opening page..." />
-                  }
+                  fallback={hasShownInitialLoader() ? (
+                    <div className="flex min-h-[24vh] items-center justify-center" role="status" aria-label="Loading page">
+                      <span className="h-8 w-8 animate-spin rounded-full border-2 border-slate-300 border-t-indigo-600" />
+                    </div>
+                  ) : <LoadingState label="Opening page..." />}
                 >
                   <Routes>
                     {/* Auth pages — clean, full screen, no navbar */}

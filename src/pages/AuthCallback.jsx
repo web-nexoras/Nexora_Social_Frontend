@@ -4,7 +4,6 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import AuthShell from "../components/AuthShell";
-import LoadingState from "../components/LoadingState";
 
 export default function AuthCallback() {
   const { isAuthenticated, getIdTokenClaims, isLoading, error } = useAuth0();
@@ -80,7 +79,9 @@ export default function AuthCallback() {
 
   return (
     <AuthShell title="Signing in..." subtitle={status}>
-      <LoadingState label={status} compact />
+      <div className="flex items-center justify-center py-3" role="status" aria-label={status}>
+        <span className="h-7 w-7 animate-spin rounded-full border-2 border-slate-300 border-t-indigo-600" />
+      </div>
     </AuthShell>
   );
 }
