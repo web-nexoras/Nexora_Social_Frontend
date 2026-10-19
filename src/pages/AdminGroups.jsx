@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { groupsApi } from "../api/groupsApi";
 import { usersApi } from "../api/usersApi";
 
@@ -12,13 +12,15 @@ export default function AdminGroups() {
   const [msg, setMsg] = useState("");
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({ name: "", description: "", price: "", currency: "BDT", image: "" });
+  const membersRequest = useRef(0);
+  const subscribersRequest = useRef(0);
 
   const load = async () => {
     try {
       const res = await groupsApi.list();
       setGroups(res.data.groups || []);
     } catch (e) {
-      console.error(e);
+      setMsg(e?.response?.data?.message || "Could not load groups");
     }
   };
 
@@ -46,20 +48,26 @@ export default function AdminGroups() {
   };
 
   const loadMembers = async (groupId) => {
+    const request = ++membersRequest.current;
     try {
       const res = await groupsApi.members(groupId);
-      setMembers(res.data.members || []);
+      if (request === membersRequest.current) setMembers(res.data?.members || []);
     } catch (e) {
-      console.error(e);
+      if (request === membersRequest.current) {
+        setMsg(e?.response?.data?.message || "Could not load group members");
+      }
     }
   };
 
   const loadSubscribers = async (groupId) => {
+    const request = ++subscribersRequest.current;
     try {
       const res = await groupsApi.subscribers(groupId);
-      setSubscribers(res.data.subscribers || []);
+      if (request === subscribersRequest.current) setSubscribers(res.data?.subscribers || []);
     } catch (e) {
-      console.error(e);
+      if (request === subscribersRequest.current) {
+        setMsg(e?.response?.data?.message || "Could not load subscribers");
+      }
     }
   };
 

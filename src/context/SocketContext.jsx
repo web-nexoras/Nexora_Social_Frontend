@@ -3,8 +3,8 @@ import { useAuth } from "./AuthContext";
 import { useNavigate } from "react-router-dom";
 import { io } from "socket.io-client";
 import { FiBell } from "react-icons/fi";
-
-const SOCKET_URL = import.meta.env.VITE_API_URL?.replace("/api/v1", "") || "http://localhost:5000";
+import { getAuthToken } from "../utils/authToken";
+import { SOCKET_URL } from "../api/config";
 
 const SocketContext = createContext({
   socket: null,
@@ -25,13 +25,16 @@ export function SocketProvider({ children }) {
   const toastTimer = useRef(null);
 
   useEffect(() => {
-    const token = localStorage.getItem("accTkn");
-    const hasToken = token && token !== "undefined" && token !== "null" && token.trim() !== "";
-    if (!user && !hasToken) return;
+    // Wait until the API session is confirmed before opening a realtime socket.
+    if (!user) {
+      setOnlineIds(new Set());
+      return;
+    }
+    const token = getAuthToken();
 
     const s = io(SOCKET_URL, {
       withCredentials: true,
-      auth: hasToken ? { token } : {},
+      auth: token ? { token } : {},
     });
     socketRef.current = s;
     setSocket(s);
@@ -79,6 +82,7 @@ export function SocketProvider({ children }) {
       s.disconnect();
       socketRef.current = null;
       setSocket(null);
+      setOnlineIds(new Set());
     };
   }, [user?._id]);
 

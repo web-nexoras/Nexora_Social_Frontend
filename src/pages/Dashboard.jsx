@@ -4,10 +4,12 @@ import { useAuth } from "../context/AuthContext";
 import api from "../api/axios";
 import { friendsApi } from "../api/friendsApi";
 import { usersApi } from "../api/usersApi";
+import { useToast } from "../context/ToastContext";
 import { FiArrowRight, FiCheck, FiX } from "react-icons/fi";
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const navigate = useNavigate();
   const isAdmin = user?.role === "admin";
   const [stats, setStats] = useState({
@@ -42,8 +44,10 @@ export default function Dashboard() {
           groups: (g.data?.groups || []).length,
           pendingRequests: (inc.data?.requests || []).length,
           totalUsers: u.data?.total || (u.data?.users || []).length,
-          pendingApprovals: (u.data?.users || []).filter((x) => !x.isApproved)
-            .length,
+          pendingApprovals: (u.data?.users || []).filter((x) => {
+            const status = x.status || (x.isApproved ? "approved" : "pending");
+            return status === "pending";
+          }).length,
         });
         setRecent((c.data?.conversations || []).slice(0, 5));
         setIncoming(inc.data?.requests || []);
@@ -51,28 +55,37 @@ export default function Dashboard() {
         if (isAdmin) setAllUsers(u.data?.users || []);
       } catch (e) {
         console.error(e);
+        showToast(e?.response?.data?.message || "Could not load dashboard data", "error");
       }
     };
     load();
   }, [isAdmin]);
 
   const accept = async (id) => {
-    await friendsApi.accept(id);
-    setIncoming((prev) => prev.filter((r) => r._id !== id));
-    setStats((s) => ({
-      ...s,
-      pendingRequests: Math.max(0, s.pendingRequests - 1),
-      friends: s.friends + 1,
-    }));
+    try {
+      await friendsApi.accept(id);
+      setIncoming((prev) => prev.filter((r) => r._id !== id));
+      setStats((s) => ({
+        ...s,
+        pendingRequests: Math.max(0, s.pendingRequests - 1),
+        friends: s.friends + 1,
+      }));
+    } catch (e) {
+      showToast(e?.response?.data?.message || "Could not accept friend request", "error");
+    }
   };
 
   const reject = async (id) => {
-    await friendsApi.reject(id);
-    setIncoming((prev) => prev.filter((r) => r._id !== id));
-    setStats((s) => ({
-      ...s,
-      pendingRequests: Math.max(0, s.pendingRequests - 1),
-    }));
+    try {
+      await friendsApi.reject(id);
+      setIncoming((prev) => prev.filter((r) => r._id !== id));
+      setStats((s) => ({
+        ...s,
+        pendingRequests: Math.max(0, s.pendingRequests - 1),
+      }));
+    } catch (e) {
+      showToast(e?.response?.data?.message || "Could not reject friend request", "error");
+    }
   };
 
   const messageAdmin = async () => {
@@ -84,12 +97,17 @@ export default function Dashboard() {
       }
     } catch (e) {
       console.error(e);
+      showToast(e?.response?.data?.message || "Could not find an admin", "error");
     }
   };
 
   const sendSuggestionRequest = async (userId) => {
-    await friendsApi.sendRequest(userId);
-    setSuggestions((prev) => prev.filter((u) => u._id !== userId));
+    try {
+      await friendsApi.sendRequest(userId);
+      setSuggestions((prev) => prev.filter((u) => u._id !== userId));
+    } catch (e) {
+      showToast(e?.response?.data?.message || "Could not send friend request", "error");
+    }
   };
 
   const cards = isAdmin

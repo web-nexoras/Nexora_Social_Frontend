@@ -6,8 +6,12 @@
     <title>Nexora Social</title>
     <script>
       // Apply saved theme before first paint to avoid a flash
-      if (localStorage.getItem("theme") === "dark") {
-        document.documentElement.classList.add("dark");
+      try {
+        if (localStorage.getItem("theme") === "dark") {
+          document.documentElement.classList.add("dark");
+        }
+      } catch {
+        // Continue with the default light theme when browser storage is blocked.
       }
     </script>
   </head>

@@ -2,10 +2,12 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { usersApi } from "../api/usersApi";
 import { FiMessageSquare } from "react-icons/fi";
+import { useToast } from "../context/ToastContext";
 
 // Floating action button — always available so any user can message an admin for free.
 export default function AdminChatFab() {
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const [busy, setBusy] = useState(false);
 
   const openAdminChat = async () => {
@@ -18,6 +20,7 @@ export default function AdminChatFab() {
       }
     } catch (e) {
       console.error(e);
+      showToast(e?.response?.data?.message || "Could not connect to an admin", "error");
     } finally {
       setBusy(false);
     }

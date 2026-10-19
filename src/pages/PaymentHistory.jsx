@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { paymentsApi } from "../api/groupsApi";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 import { FiCheck, FiX, FiUsers, FiClock, FiCreditCard, FiTrash2 } from "react-icons/fi";
 
 const fmtDate = (d) => (d ? new Date(d).toLocaleDateString() : "—");
@@ -156,6 +157,7 @@ function MySubscriptionCard({ s, onAction, busy }) {
 
 export default function PaymentHistory() {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const isAdmin = user?.role === "admin";
   const [subs, setSubs] = useState([]);
   const [allSubs, setAllSubs] = useState([]);
@@ -169,6 +171,7 @@ export default function PaymentHistory() {
       setSubs(res.data.subscriptions || []);
     } catch (e) {
       console.error(e);
+      showToast(e?.response?.data?.message || "Could not load your subscriptions", "error");
     }
   };
 
@@ -184,6 +187,7 @@ export default function PaymentHistory() {
       setAllSubs(res.data.subscriptions || []);
     } catch (e) {
       console.error(e);
+      showToast(e?.response?.data?.message || "Could not load subscribers", "error");
     }
   };
 
@@ -209,6 +213,7 @@ export default function PaymentHistory() {
       await loadMy();
     } catch (e) {
       console.error(e);
+      showToast(e?.response?.data?.message || "Could not update payment", "error");
     } finally {
       setBusyId(null);
     }
@@ -261,7 +266,7 @@ export default function PaymentHistory() {
             <h2 className="text-2xl font-bold text-brand">All Subscribers</h2>
 
             {/* Card-style summary pills */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               <span className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl neo-raised-sm text-sm font-bold text-slate-700">
                 <FiUsers className="text-slate-500" />
                 {dedupedSubs.length}

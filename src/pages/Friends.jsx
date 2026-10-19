@@ -1,10 +1,12 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { friendsApi } from "../api/friendsApi";
+import { useToast } from "../context/ToastContext";
 
 const TABS = ["Suggestions", "Incoming", "Sent", "Friends"];
 
 export default function Friends() {
+  const { showToast } = useToast();
   const [searchParams] = useSearchParams();
   const searchQuery = searchParams.get("search") || "";
   const [activeTab, setActiveTab] = useState("Suggestions");
@@ -13,8 +15,10 @@ export default function Friends() {
   const [sent, setSent] = useState([]);
   const [friends, setFriends] = useState([]);
   const [loading, setLoading] = useState(false);
+  const loadSequence = useRef(0);
 
   const loadAll = async () => {
+    const sequence = ++loadSequence.current;
     setLoading(true);
     try {
       const [s, i, f, se] = await Promise.all([
@@ -23,19 +27,25 @@ export default function Friends() {
         friendsApi.list(),
         friendsApi.sent(),
       ]);
+      if (sequence !== loadSequence.current) return;
       setSuggestions(s.data?.users || []);
       setIncoming(i.data?.requests || []);
       setFriends(f.data?.friends || []);
       setSent(se.data?.requests || []);
     } catch (e) {
+      if (sequence !== loadSequence.current) return;
       console.error(e);
+      showToast(e?.response?.data?.message || "Could not load friends", "error");
     } finally {
-      setLoading(false);
+      if (sequence === loadSequence.current) setLoading(false);
     }
   };
 
   useEffect(() => {
     loadAll();
+    return () => {
+      loadSequence.current += 1;
+    };
   }, [searchQuery]);
 
   useEffect(() => {
@@ -45,23 +55,39 @@ export default function Friends() {
   }, [searchQuery]);
 
   const sendRequest = async (userId) => {
-    await friendsApi.sendRequest(userId);
-    loadAll();
+    try {
+      await friendsApi.sendRequest(userId);
+      await loadAll();
+    } catch (e) {
+      showToast(e?.response?.data?.message || "Could not send friend request", "error");
+    }
   };
 
   const accept = async (id) => {
-    await friendsApi.accept(id);
-    loadAll();
+    try {
+      await friendsApi.accept(id);
+      await loadAll();
+    } catch (e) {
+      showToast(e?.response?.data?.message || "Could not accept friend request", "error");
+    }
   };
 
   const reject = async (id) => {
-    await friendsApi.reject(id);
-    loadAll();
+    try {
+      await friendsApi.reject(id);
+      await loadAll();
+    } catch (e) {
+      showToast(e?.response?.data?.message || "Could not reject friend request", "error");
+    }
   };
 
   const cancel = async (id) => {
-    await friendsApi.cancel(id);
-    loadAll();
+    try {
+      await friendsApi.cancel(id);
+      await loadAll();
+    } catch (e) {
+      showToast(e?.response?.data?.message || "Could not cancel friend request", "error");
+    }
   };
 
   if (loading) return <p className="text-center mt-10">Loading...</p>;

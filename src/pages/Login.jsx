@@ -9,6 +9,9 @@ import PasswordInput from "../components/PasswordInput";
 export default function Login() {
   const { login } = useAuth();
   const { loginWithRedirect, isLoading: auth0Loading } = useAuth0();
+  const auth0Configured = Boolean(
+    import.meta.env.VITE_AUTH0_DOMAIN && import.meta.env.VITE_AUTH0_CLIENT_ID,
+  );
   const { showToast } = useToast();
   const navigate = useNavigate();
 
@@ -44,7 +47,10 @@ export default function Login() {
       showToast("Signed in successfully! Welcome back.", "success");
       navigate("/dashboard");
     } catch (err) {
-      const msg = err?.response?.data?.message || "Invalid email or password";
+      const msg = err?.response?.data?.message ||
+        (err?.code === "ERR_NETWORK" || !err?.response
+          ? "Cannot connect to the server. Check your connection and try again."
+          : "Invalid email or password");
       const isPending = msg.toLowerCase().includes("waiting for admin approval") || msg.toLowerCase().includes("pending");
       const isRejected = msg.toLowerCase().includes("rejected");
 
@@ -141,11 +147,12 @@ export default function Login() {
           {loading ? "Signing in..." : "Sign In"}
         </button>
 
-        {/* Social login */}
-        <div className="flex justify-center text-xs my-2">
-          <span className="text-slate-400">or continue with</span>
-        </div>
-
+        {/* Social login is unavailable until Auth0 is configured. */}
+        {auth0Configured && (
+          <>
+            <div className="flex justify-center text-xs my-2">
+              <span className="text-slate-400">or continue with</span>
+            </div>
         <div className="grid grid-cols-2 gap-3">
           <button
             type="button"
@@ -166,6 +173,8 @@ export default function Login() {
             GitHub
           </button>
         </div>
+          </>
+        )}
       </form>
     </AuthShell>
   );

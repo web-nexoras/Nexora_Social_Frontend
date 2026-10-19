@@ -2,10 +2,12 @@ import React, { useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { usersApi } from "../api/usersApi";
+import { useToast } from "../context/ToastContext";
 import { FiMenu, FiSearch } from "react-icons/fi";
 
 export default function Topbar({ onMenuClick }) {
   const { user, logout } = useAuth();
+  const { showToast } = useToast();
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
@@ -24,25 +26,37 @@ export default function Topbar({ onMenuClick }) {
   // Live search while typing (debounced)
   useEffect(() => {
     const q = query.trim();
+    let active = true;
     if (!q) {
       setResults([]);
       setShowResults(false);
-      return;
+      setSearching(false);
+      return () => {
+        active = false;
+      };
     }
     setSearching(true);
     const t = setTimeout(async () => {
       try {
         const res = await usersApi.search(q);
-        setResults(res.data?.users || []);
-        setShowResults(true);
+        if (active) {
+          setResults(res.data?.users || []);
+          setShowResults(true);
+        }
       } catch (e) {
-        console.error(e);
-        setResults([]);
+        if (active) {
+          console.error(e);
+          setResults([]);
+          showToast(e?.response?.data?.message || "Could not search users", "error");
+        }
       } finally {
-        setSearching(false);
+        if (active) setSearching(false);
       }
     }, 300);
-    return () => clearTimeout(t);
+    return () => {
+      active = false;
+      clearTimeout(t);
+    };
   }, [query]);
 
   // Close dropdowns on outside click

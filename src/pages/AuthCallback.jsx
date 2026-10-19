@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useAuth0 } from "@auth0/auth0-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -11,8 +11,17 @@ export default function AuthCallback() {
   const { showToast } = useToast();
   const navigate = useNavigate();
   const [status, setStatus] = useState("Signing you in...");
+  const oauthExchange = useRef(null);
 
   useEffect(() => {
+    const auth0Configured = Boolean(
+      import.meta.env.VITE_AUTH0_DOMAIN && import.meta.env.VITE_AUTH0_CLIENT_ID,
+    );
+    if (!auth0Configured) {
+      navigate("/login", { replace: true });
+      return;
+    }
+
     if (isLoading) return;
 
     if (error) {
@@ -31,11 +40,17 @@ export default function AuthCallback() {
     let cancelled = false;
     (async () => {
       try {
-        const claims = await getIdTokenClaims();
-        const idToken = claims?.__raw;
-        if (!idToken) throw new Error("No ID token received from Auth0");
+        // Reuse the same exchange across React StrictMode's development effect replay.
+        if (!oauthExchange.current) {
+          oauthExchange.current = (async () => {
+            const claims = await getIdTokenClaims();
+            const idToken = claims?.__raw;
+            if (!idToken) throw new Error("No ID token received from Auth0");
+            return oauthLogin(idToken);
+          })();
+        }
 
-        const data = await oauthLogin(idToken);
+        const data = await oauthExchange.current;
         if (cancelled) return;
 
         if (data?.pending) {
@@ -48,7 +63,10 @@ export default function AuthCallback() {
         }
       } catch (err) {
         if (cancelled) return;
-        const msg = err?.response?.data?.message || "OAuth login failed. Try again.";
+        const msg = err?.response?.data?.message ||
+          (err?.code === "ERR_NETWORK" || !err?.response
+            ? "Could not connect to the server. Check your connection and try again."
+            : "OAuth login failed. Try again.");
         const isPending = err?.response?.data?.pending;
         setStatus(msg);
         showToast(msg, isPending ? "info" : "error", 6000);

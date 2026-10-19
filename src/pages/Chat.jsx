@@ -46,6 +46,7 @@ export default function Chat() {
   const [memberQuery, setMemberQuery] = useState("");
   const [memberResults, setMemberResults] = useState([]);
   const [memberMsg, setMemberMsg] = useState("");
+  const memberSearchSequence = useRef(0);
   const [adding, setAdding] = useState(false);
   const [groupMembers, setGroupMembers] = useState([]);
   const [showPay, setShowPay] = useState(false);
@@ -59,8 +60,12 @@ export default function Chat() {
   const [editText, setEditText] = useState("");
 
   const loadConversations = async () => {
-    const res = await chatApi.conversations();
-    setConversations(res.data.conversations || []);
+    try {
+      const res = await chatApi.conversations();
+      setConversations(res.data?.conversations || []);
+    } catch (e) {
+      showToast(e?.response?.data?.message || "Could not load conversations", "error");
+    }
   };
 
   useEffect(() => {
@@ -74,9 +79,11 @@ export default function Chat() {
 
   useEffect(() => {
     if (!targetUserId || targetUserId === user?._id) return;
+    let alive = true;
     const init = async () => {
       try {
         const res = await chatApi.createDirect(targetUserId);
+        if (!alive) return;
         const conv = res.data.conversation;
         setActiveId(conv._id);
         setConversations((prev) => {
@@ -85,27 +92,35 @@ export default function Chat() {
           return [conv, ...prev];
         });
       } catch (e) {
+        if (!alive) return;
         const msg = e?.response?.data?.message || "Could not open chat";
         showToast(msg);
       }
     };
     init();
+    return () => {
+      alive = false;
+    };
   }, [targetUserId]);
 
   useEffect(() => {
     if (!activeId) return;
+    let alive = true;
     const load = async () => {
       setLoading(true);
       try {
         const res = await chatApi.messages(activeId);
-        setMessages(res.data.messages || []);
+        if (alive) setMessages(res.data?.messages || []);
       } catch (e) {
-        console.error(e);
+        if (alive) console.error(e);
       } finally {
-        setLoading(false);
+        if (alive) setLoading(false);
       }
     };
     load();
+    return () => {
+      alive = false;
+    };
   }, [activeId]);
 
   // Detect if the active conversation is a group the user is NOT a member of
@@ -117,6 +132,7 @@ export default function Chat() {
       return;
     }
     // Reset the add-member panel when switching conversations
+    memberSearchSequence.current += 1;
     setShowAddMember(false);
     setMemberQuery("");
     setMemberResults([]);
@@ -293,6 +309,7 @@ export default function Chat() {
       cancelEdit();
     } catch (e) {
       console.error(e);
+      showToast(e?.response?.data?.message || "Could not update message", "error");
     }
   };
 
@@ -315,6 +332,7 @@ export default function Chat() {
       setText("");
     } catch (e) {
       console.error(e);
+      showToast(e?.response?.data?.message || "Message could not be sent", "error");
     }
   };
 
@@ -375,6 +393,7 @@ export default function Chat() {
       setMessages((prev) => prev.filter((m) => m._id !== messageId));
     } catch (e) {
       console.error(e);
+      showToast(e?.response?.data?.message || "Could not delete message", "error");
     }
   };
 
@@ -402,6 +421,7 @@ export default function Chat() {
   };
 
   const searchMembers = async (q) => {
+    const sequence = ++memberSearchSequence.current;
     setMemberQuery(q);
     if (!q.trim()) {
       setMemberResults([]);
@@ -409,9 +429,11 @@ export default function Chat() {
     }
     try {
       const res = await usersApi.search(q.trim());
-      setMemberResults(res.data?.users || []);
+      if (sequence === memberSearchSequence.current) {
+        setMemberResults(res.data?.users || []);
+      }
     } catch (e) {
-      setMemberResults([]);
+      if (sequence === memberSearchSequence.current) setMemberResults([]);
     }
   };
 

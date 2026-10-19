@@ -16,23 +16,28 @@ export default function UserProfile() {
   const [loading, setLoading] = useState(true);
   const [imgError, setImgError] = useState(false);
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const res = await usersApi.get(id);
-      setUser(res.data?.user || null);
-      setRelationship(res.data?.relationship || null);
-      setIsSelf(!!res.data?.isSelf);
-    } catch (e) {
-      console.error(e);
-      setUser(null);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    const load = async () => {
+      try {
+        const res = await usersApi.get(id);
+        if (!alive) return;
+        setUser(res.data?.user || null);
+        setRelationship(res.data?.relationship || null);
+        setIsSelf(!!res.data?.isSelf);
+      } catch (e) {
+        if (!alive) return;
+        console.error(e);
+        setUser(null);
+      } finally {
+        if (alive) setLoading(false);
+      }
+    };
     load();
+    return () => {
+      alive = false;
+    };
   }, [id]);
 
   const addFriend = async () => {

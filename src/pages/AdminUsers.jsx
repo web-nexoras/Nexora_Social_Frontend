@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { usersApi } from "../api/usersApi";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
@@ -11,8 +11,10 @@ export default function AdminUsers() {
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
   const [filter, setFilter] = useState("all");
+  const loadSequence = useRef(0);
 
   const load = async () => {
+    const sequence = ++loadSequence.current;
     setLoading(true);
     try {
       const params = {};
@@ -22,16 +24,23 @@ export default function AdminUsers() {
       if (filter === "pending") params.approval = "pending";
       if (filter === "rejected") params.approval = "rejected";
       const res = await usersApi.list(params);
-      setUsers(res.data.users || []);
+      if (sequence === loadSequence.current) setUsers(res.data?.users || []);
     } catch (e) {
-      console.error(e);
+      if (sequence === loadSequence.current) {
+        const err = e?.response?.data?.message || "Could not load users";
+        setMsg(err);
+        showToast(err, "error");
+      }
     } finally {
-      setLoading(false);
+      if (sequence === loadSequence.current) setLoading(false);
     }
   };
 
   useEffect(() => {
     load();
+    return () => {
+      loadSequence.current += 1;
+    };
   }, [filter]);
 
   const approve = async (id) => {

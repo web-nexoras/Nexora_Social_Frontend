@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { authApi } from "../api/authApi";
+import { clearAuthToken, setAuthToken } from "../utils/authToken";
 
 const AuthContext = createContext(null);
 
@@ -10,19 +11,14 @@ export function AuthProvider({ children }) {
   // Load current user on app start
   useEffect(() => {
     const loadUser = async () => {
-      const token = localStorage.getItem("accTkn");
-      if (!token || token === "undefined" || token === "null") {
-        localStorage.removeItem("accTkn");
-        setUser(null);
-        setLoading(false);
-        return;
-      }
       try {
+        // Always check the session so httpOnly-cookie sessions survive refreshes.
         const res = await authApi.getProfile();
         setUser(res.data?.user || res.data);
       } catch (error) {
         setUser(null);
-        localStorage.removeItem("accTkn");
+        // A temporary network/server failure must not erase a still-valid token.
+        if ([401, 403].includes(error?.response?.status)) clearAuthToken();
       } finally {
         setLoading(false);
       }
@@ -33,9 +29,7 @@ export function AuthProvider({ children }) {
   const login = async (email, password) => {
     const res = await authApi.signin(email, password);
     const token = res.data?.accessToken;
-    if (token && token !== "undefined" && token !== "null") {
-      localStorage.setItem("accTkn", token);
-    }
+    setAuthToken(token);
     if (res.data?.user) {
       setUser(res.data.user);
       return res.data;
@@ -58,9 +52,7 @@ export function AuthProvider({ children }) {
   const oauthLogin = async (idToken) => {
     const res = await authApi.oauthAuth0(idToken);
     const token = res.data?.accessToken;
-    if (token && token !== "undefined" && token !== "null") {
-      localStorage.setItem("accTkn", token);
-    }
+    setAuthToken(token);
     if (res.data?.user) {
       setUser(res.data.user);
     } else {
@@ -73,8 +65,10 @@ export function AuthProvider({ children }) {
   const logout = async () => {
     try {
       await authApi.signout();
+    } catch {
+      // Sign out locally even when the API cannot be reached.
     } finally {
-      localStorage.removeItem("accTkn");
+      clearAuthToken();
       setUser(null);
     }
   };

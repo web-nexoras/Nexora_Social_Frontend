@@ -18,6 +18,7 @@ export default function Groups() {
       setGroups(res.data.groups || []);
     } catch (e) {
       console.error(e);
+      setMsg(e?.response?.data?.message || "Could not load groups. Check your connection and try again.");
     } finally {
       setLoading(false);
     }
@@ -83,7 +84,7 @@ export default function Groups() {
           </div>
         ))}
       </div>
-      {groups.length === 0 && <p className="text-center text-slate-500 mt-10">No groups available</p>}
+      {groups.length === 0 && !msg && <p className="text-center text-slate-500 mt-10">No groups available</p>}
     </div>
   );
 }
