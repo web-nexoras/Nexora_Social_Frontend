@@ -29,4 +29,4 @@ optional; password login remains available without it.
 
 ## Notes
 - Uses httpOnly cookies (withCredentials)
-- Socket connects to backend URL
+- Socket.IO uses the Vite proxy during development and the configured API host in production.

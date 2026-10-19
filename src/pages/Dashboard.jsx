@@ -26,6 +26,7 @@ export default function Dashboard() {
   const [suggestions, setSuggestions] = useState([]);
 
   useEffect(() => {
+    let alive = true;
     const load = async () => {
       try {
         const [f, c, g, inc, u, s] = await Promise.all([
@@ -38,6 +39,7 @@ export default function Dashboard() {
             : Promise.resolve({ data: { users: [], total: 0 } }),
           friendsApi.suggestions(),
         ]);
+        if (!alive) return;
         setStats({
           friends: (f.data?.friends || []).length,
           conversations: (c.data?.conversations || []).length,
@@ -54,11 +56,15 @@ export default function Dashboard() {
         setSuggestions(s.data?.users || []);
         if (isAdmin) setAllUsers(u.data?.users || []);
       } catch (e) {
+        if (!alive) return;
         console.error(e);
         showToast(e?.response?.data?.message || "Could not load dashboard data", "error");
       }
     };
     load();
+    return () => {
+      alive = false;
+    };
   }, [isAdmin]);
 
   const accept = async (id) => {

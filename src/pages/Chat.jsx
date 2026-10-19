@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useSocket } from "../context/SocketContext";
+import { useToast } from "../context/ToastContext";
 import { chatApi } from "../api/chatApi";
 import { groupsApi, paymentsApi } from "../api/groupsApi";
 import { usersApi } from "../api/usersApi";
@@ -33,7 +34,8 @@ export default function Chat() {
   const [mobileView, setMobileView] = useState("list");
   const [highlighted, setHighlighted] = useState(new Set());
   const [unreadIds, setUnreadIds] = useState(new Set());
-  const { socket, onlineIds, showToast } = useSocket();
+  const { socket, onlineIds } = useSocket();
+  const { showToast } = useToast();
   const [lockedGroup, setLockedGroup] = useState(null);
 
   const activeIdRef = useRef(null);
@@ -107,12 +109,15 @@ export default function Chat() {
     if (!activeId) return;
     let alive = true;
     const load = async () => {
+      setMessages([]);
       setLoading(true);
       try {
         const res = await chatApi.messages(activeId);
         if (alive) setMessages(res.data?.messages || []);
       } catch (e) {
-        if (alive) console.error(e);
+        if (alive) {
+          showToast(e?.response?.data?.message || "Could not load messages", "error");
+        }
       } finally {
         if (alive) setLoading(false);
       }
@@ -121,7 +126,7 @@ export default function Chat() {
     return () => {
       alive = false;
     };
-  }, [activeId]);
+  }, [activeId, showToast]);
 
   // Detect if the active conversation is a group the user is NOT a member of
   useEffect(() => {
@@ -186,7 +191,9 @@ export default function Chat() {
     if (!socket) return;
 
     const onMessageNew = (msg) => {
+      if (!msg || typeof msg !== "object") return;
       const convId = msg.conversation?._id || msg.conversation;
+      if (!convId) return;
       const isActiveConv = convId === activeIdRef.current;
 
       if (isActiveConv) {
@@ -223,12 +230,16 @@ export default function Chat() {
       });
     };
 
-    const onMessageDeleted = ({ messageId }) => {
+    const onMessageDeleted = (payload) => {
+      const messageId = payload?.messageId;
+      if (!messageId) return;
       setMessages((prev) => prev.filter((m) => m._id !== messageId));
     };
 
     // A conversation was deleted (by admin or a participant) — drop it from the list
-    const onConversationDeleted = ({ conversationId }) => {
+    const onConversationDeleted = (payload) => {
+      const conversationId = payload?.conversationId;
+      if (!conversationId) return;
       setConversations((prev) => prev.filter((c) => c._id !== conversationId));
       setUnreadIds((prev) => {
         const next = new Set(prev);
@@ -243,7 +254,9 @@ export default function Chat() {
     };
 
     // A message was edited by its author (or an admin)
-    const onMessageUpdated = ({ message }) => {
+    const onMessageUpdated = (payload) => {
+      const message = payload?.message;
+      if (!message?._id) return;
       setMessages((prev) =>
         prev.map((m) =>
           m._id === message._id

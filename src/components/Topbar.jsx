@@ -35,6 +35,7 @@ export default function Topbar({ onMenuClick }) {
         active = false;
       };
     }
+    setResults([]);
     setSearching(true);
     const t = setTimeout(async () => {
       try {

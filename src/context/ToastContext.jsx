@@ -24,7 +24,7 @@ export function ToastProvider({ children }) {
     <ToastContext.Provider value={{ showToast }}>
       {children}
       {/* Toast container */}
-      <div className="fixed top-5 right-5 z-50 flex flex-col gap-2.5 max-w-sm w-full pointer-events-none px-4 sm:px-0">
+      <div className="fixed top-5 left-0 right-0 z-50 mx-auto flex w-full max-w-sm flex-col gap-2.5 pointer-events-none px-4 sm:left-auto sm:right-5 sm:mx-0 sm:px-0">
         {toasts.map((toast) => {
           let bg = "bg-slate-900/95 text-white border-slate-700/70";
           let icon = <FiInfo className="text-sky-400 text-lg shrink-0 mt-0.5" />;

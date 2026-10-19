@@ -163,7 +163,7 @@ export default function AdminGroups() {
                 <p className="text-sm text-slate-500">{g.description}</p>
                 <p className="text-sm mt-1">Price: {g.price} {g.currency}</p>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap justify-end gap-2">
                 <button
                   onClick={() => startEdit(g)}
                   className="text-xs px-3 py-1 rounded bg-brand text-white hover:bg-slate-700"
@@ -179,6 +179,8 @@ export default function AdminGroups() {
                 <button
                   onClick={() => {
                     setSelectedGroup(g._id);
+                    setMembers([]);
+                    setSubscribers([]);
                     refreshGroup(g._id);
                   }}
                   className="text-xs px-3 py-1 rounded bg-slate-200 hover:bg-slate-300"

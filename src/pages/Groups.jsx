@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { FiCheck } from "react-icons/fi";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { groupsApi } from "../api/groupsApi";
 import { useAuth } from "../context/AuthContext";
 
@@ -44,9 +44,9 @@ export default function Groups() {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-3xl font-bold text-brand">Groups</h1>
         {user?.role === "admin" && (
-          <a href="/admin/groups" className="px-4 py-2 rounded-lg bg-accent text-white font-semibold hover:bg-cyan-600 transition">
+          <Link to="/admin/groups" className="px-4 py-2 rounded-lg bg-accent text-white font-semibold hover:bg-cyan-600 transition">
             Admin Panel
-          </a>
+          </Link>
         )}
       </div>
       {msg && <p className="text-sm text-red-500 mb-4">{msg}</p>}

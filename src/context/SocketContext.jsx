@@ -39,13 +39,17 @@ export function SocketProvider({ children }) {
     socketRef.current = s;
     setSocket(s);
 
-    s.on("presence:list", ({ onlineUserIds }) => {
-      setOnlineIds(new Set(onlineUserIds || []));
+    s.on("presence:list", (payload) => {
+      setOnlineIds(new Set(Array.isArray(payload?.onlineUserIds) ? payload.onlineUserIds : []));
     });
-    s.on("user:online", ({ userId }) => {
+    s.on("user:online", (payload) => {
+      const userId = payload?.userId;
+      if (!userId) return;
       setOnlineIds((prev) => new Set(prev).add(userId));
     });
-    s.on("user:offline", ({ userId }) => {
+    s.on("user:offline", (payload) => {
+      const userId = payload?.userId;
+      if (!userId) return;
       setOnlineIds((prev) => {
         const next = new Set(prev);
         next.delete(userId);
@@ -54,12 +58,15 @@ export function SocketProvider({ children }) {
     });
 
     s.on("message:new", (msg) => {
+      if (!msg || typeof msg !== "object") return;
       const senderId = msg.sender?._id || msg.sender;
       const isMine = senderId === user?._id;
       if (isMine) return;
 
       try {
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) throw new Error("Audio playback is unavailable");
+        const ctx = new AudioContextClass();
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.type = "sine";
@@ -68,8 +75,11 @@ export function SocketProvider({ children }) {
         osc.connect(gain);
         gain.connect(ctx.destination);
         osc.start();
+        osc.onended = () => ctx.close().catch(() => {});
         osc.stop(ctx.currentTime + 0.15);
-      } catch (e) {}
+      } catch {
+        // Audio is optional and may be blocked by mobile browser policies.
+      }
 
       const convId = msg.conversation?._id || msg.conversation;
       setToast({ convId, text: `New message from ${msg.sender?.fullname || "Someone"}` });
@@ -107,11 +117,11 @@ export function SocketProvider({ children }) {
       {toast && (
         <div
           onClick={() => goToChat(toast.convId)}
-          className="fixed top-20 right-4 z-[70] bg-slate-900 border border-slate-700 shadow-lg rounded-xl px-4 py-3 text-sm text-white flex items-center gap-2 cursor-pointer hover:bg-slate-800 transition"
+          className="fixed top-20 left-4 right-4 sm:left-auto sm:right-4 sm:max-w-sm z-[70] bg-slate-900 border border-slate-700 shadow-lg rounded-xl px-4 py-3 text-sm text-white flex items-center gap-2 cursor-pointer hover:bg-slate-800 transition"
         >
           <FiBell className="shrink-0" />
-          <span>{toast.text}</span>
-          <span className="text-xs text-slate-400 ml-2">tap to open</span>
+          <span className="min-w-0 flex-1 break-words">{toast.text}</span>
+          <span className="text-xs text-slate-400 ml-2 shrink-0">tap to open</span>
         </div>
       )}
     </SocketContext.Provider>
