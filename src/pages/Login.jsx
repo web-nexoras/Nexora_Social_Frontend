@@ -122,13 +122,14 @@ export default function Login() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+      <form onSubmit={handleSubmit} className="space-y-4" autoComplete="on" noValidate>
         {/* Email */}
         <div className="space-y-1">
           {fieldErrors.email && (
             <p className="mb-px px-1 text-rose-700 text-xs font-bold">{fieldErrors.email}</p>
           )}
           <input
+            name="email"
             type="email"
             placeholder="Email"
             value={email}
@@ -146,6 +147,7 @@ export default function Login() {
 
         {/* Password */}
         <PasswordInput
+          name="password"
           value={password}
           onChange={(e) => {
             setPassword(e.target.value);

@@ -57,7 +57,6 @@ export default function Chat() {
   const [payMethod, setPayMethod] = useState("bkash");
   const [paying, setPaying] = useState(false);
   const [payMsg, setPayMsg] = useState("");
-  const [payDone, setPayDone] = useState(false);
   const [menuConvId, setMenuConvId] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [editText, setEditText] = useState("");
@@ -128,6 +127,24 @@ export default function Chat() {
       alive = false;
     };
   }, [activeId, showToast]);
+
+  // Keep a pending group chat in sync when an admin approves the subscription.
+  useEffect(() => {
+    if (!activeId || !lockedGroup) return;
+    const timer = window.setInterval(async () => {
+      try {
+        const res = await groupsApi.byConversation(activeId);
+        if (!res.data?.isMember) return;
+        setLockedGroup(null);
+        showToast("Your subscription was approved. You have joined the group.", "success");
+        const messagesRes = await chatApi.messages(activeId);
+        setMessages(messagesRes.data?.messages || []);
+      } catch (e) {
+        // Transient refresh errors should not interrupt the chat.
+      }
+    }, 10000);
+    return () => window.clearInterval(timer);
+  }, [activeId, lockedGroup?._id]);
 
   // Detect if the active conversation is a group the user is NOT a member of
   useEffect(() => {
@@ -369,7 +386,6 @@ export default function Chat() {
       setPayTxn(res.data?.transactionId || null);
       setPayMethod("bkash");
       setPayMsg("");
-      setPayDone(false);
       setShowSubscribe(false);
       setShowPay(true);
     } catch (e) {
@@ -387,21 +403,10 @@ export default function Chat() {
     setPaying(true);
     setPayMsg("");
     try {
-      const res = await paymentsApi.demoConfirm(payTxn, payMethod);
-      setPayMsg(res.data?.message || "Payment successful");
-      setPayDone(true);
-      // Now a member — refresh the conversation so the group unlocks
+      await paymentsApi.demoConfirm(payTxn, payMethod);
+      showToast("Payment successful. Your request was sent to the admin; group access starts after approval.", "success", 7000);
+      setShowPay(false);
       setShowSubscribe(false);
-      setLockedGroup(null);
-      await loadConversations();
-      if (activeId) {
-        try {
-          const mres = await chatApi.messages(activeId);
-          setMessages(mres.data.messages || []);
-        } catch (e) {
-          console.error(e);
-        }
-      }
     } catch (e) {
       setPayMsg(e?.response?.data?.message || "Payment failed");
     } finally {
@@ -524,10 +529,10 @@ export default function Chat() {
             </h3>
             <p className="text-slate-600 mb-3">
               You are not a member of <strong>{lockedGroup.name}</strong> yet.
-              If you want to be added to this group, you can subscribe.
+              Subscribe to join and unlock the group chat.
             </p>
             <p className="text-sm text-slate-500 mb-6">
-              After a successful payment, the admin will add you to the group.
+              Your membership activates after the admin approves your payment.
             </p>
             {subscribeMsg && (
               <p className="text-sm text-red-500 mb-4">{subscribeMsg}</p>
@@ -538,7 +543,7 @@ export default function Chat() {
                 disabled={subscribing}
                 className="flex-1 px-4 py-2 rounded-lg bg-accent text-white font-semibold hover:bg-cyan-600 transition disabled:opacity-60"
               >
-                {subscribing ? "Redirecting..." : "Subscribe"}
+                {subscribing ? "Preparing payment..." : "Subscribe"}
               </button>
               <button
                 onClick={() => setShowSubscribe(false)}

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { FiArrowLeft, FiArrowRight, FiCheckCircle } from "react-icons/fi";
+import { FiArrowLeft, FiArrowRight } from "react-icons/fi";
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
@@ -33,8 +33,7 @@ export default function VerifyOtp() {
     setLoading(true);
     try {
       await verifyOtp(email, otp);
-      setMsg("Email verified successfully! Your account is now pending admin approval. You can log in once an admin approves your account.");
-      showToast("Email verified! Account pending admin approval.", "success", 6000);
+      showToast("Email verified. Your account is pending admin approval.", "success", 6000);
       setTimeout(() => navigate("/signin"), 1500);
     } catch (err) {
       const errMsg = err?.response?.data?.message || "OTP verification failed. Check the code and try again.";
@@ -79,16 +78,6 @@ export default function VerifyOtp() {
         )
       }
     >
-      {msg && (
-        <div className="text-emerald-700 text-sm mb-4 bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-start gap-3 shadow-sm">
-          <FiCheckCircle className="text-emerald-500 text-lg shrink-0 mt-0.5" />
-          <div className="leading-relaxed">
-            <p className="font-semibold text-emerald-800">Email Verified!</p>
-            <p className="text-xs text-emerald-600 mt-1">{msg}</p>
-          </div>
-        </div>
-      )}
-
       {error && (
         <div className="text-rose-600 text-sm mb-4 text-center bg-rose-50 border border-rose-200 rounded-xl py-2.5 px-3">
           {error}

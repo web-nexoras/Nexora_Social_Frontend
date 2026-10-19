@@ -86,7 +86,7 @@ export default function Signup() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+      <form onSubmit={handleSubmit} className="space-y-4" autoComplete="on" noValidate>
         {/* Full Name */}
         <div className="space-y-1">
           {fieldErrors.fullname && (
