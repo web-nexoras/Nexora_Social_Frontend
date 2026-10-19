@@ -24,6 +24,7 @@ import AdminGroups from "./pages/AdminGroups";
 import AdminUsers from "./pages/AdminUsers";
 import PaymentHistory from "./pages/PaymentHistory";
 import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import AuthCallback from "./pages/AuthCallback";
 
 export default function App() {
