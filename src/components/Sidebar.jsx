@@ -7,6 +7,8 @@ import {
   FiUser,
   FiUsers,
   FiMessageSquare,
+  FiRss,
+  FiCamera,
   FiTag,
   FiCreditCard,
   FiShield,
@@ -43,6 +45,12 @@ export default function Sidebar({ onNavigate }) {
         </NavLink>
         <NavLink to="/friends" className={linkClass}>
           <FiUsers className="shrink-0" /> Friends
+        </NavLink>
+        <NavLink to="/feed" className={linkClass}>
+          <FiRss className="shrink-0" /> Feed
+        </NavLink>
+        <NavLink to="/stories" className={linkClass}>
+          <FiCamera className="shrink-0" /> Stories
         </NavLink>
         <NavLink to="/chat" className={linkClass}>
           <FiMessageSquare className="shrink-0" /> Messages

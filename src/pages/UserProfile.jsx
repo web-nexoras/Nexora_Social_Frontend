@@ -3,6 +3,7 @@ import { FiCheck, FiMail, FiMapPin, FiShield, FiUserPlus, FiMessageSquare, FiArr
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { usersApi } from "../api/usersApi";
 import { friendsApi } from "../api/friendsApi";
+import { followsApi } from "../api/followsApi";
 import { useToast } from "../context/ToastContext";
 import InlineLoader from "../components/InlineLoader";
 
@@ -15,6 +16,7 @@ export default function UserProfile() {
   const [relationship, setRelationship] = useState(null);
   const [isSelf, setIsSelf] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [following, setFollowing] = useState(false);
   const [imgError, setImgError] = useState(false);
 
   useEffect(() => {
@@ -27,6 +29,9 @@ export default function UserProfile() {
         setUser(res.data?.user || null);
         setRelationship(res.data?.relationship || null);
         setIsSelf(!!res.data?.isSelf);
+        if (!res.data?.isSelf) {
+          followsApi.status(id).then((r) => setFollowing(!!r.data?.following)).catch(() => {});
+        }
       } catch (e) {
         if (!alive) return;
         console.error(e);
@@ -49,6 +54,22 @@ export default function UserProfile() {
     } catch (e) {
       const errMsg = e?.response?.data?.message || "Could not send friend request";
       showToast(errMsg, "error");
+    }
+  };
+
+  const toggleFollow = async () => {
+    try {
+      if (following) {
+        await followsApi.unfollow(id);
+        setFollowing(false);
+        showToast("Unfollowed", "info");
+      } else {
+        await followsApi.follow(id);
+        setFollowing(true);
+        showToast("Following", "success");
+      }
+    } catch (e) {
+      showToast(e?.response?.data?.message || "Failed", "error");
     }
   };
 
@@ -204,6 +225,17 @@ export default function UserProfile() {
               >
                 <FiMessageSquare /> Message
               </Link>
+            )}
+
+            {!isSelf && (
+              <button
+                onClick={toggleFollow}
+                className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition ${
+                  following ? "bg-slate-200 text-slate-700 hover:bg-slate-300" : "bg-cyan-600 text-white hover:bg-cyan-700"
+                }`}
+              >
+                {following ? "Following" : "Follow"}
+              </button>
             )}
 
             <button

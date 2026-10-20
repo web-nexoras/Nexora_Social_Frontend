@@ -17,6 +17,8 @@ const Profile = lazy(() => import("./pages/Profile"));
 const UserProfile = lazy(() => import("./pages/UserProfile"));
 const Friends = lazy(() => import("./pages/Friends"));
 const Chat = lazy(() => import("./pages/Chat"));
+const Feed = lazy(() => import("./pages/Feed"));
+const Stories = lazy(() => import("./pages/Stories"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Groups = lazy(() => import("./pages/Groups"));
 const PaymentSuccess = lazy(() => import("./pages/PaymentSuccess"));
@@ -107,6 +109,8 @@ export default function App() {
                       <Route path="/profile" element={<Profile />} />
                       <Route path="/user/:id" element={<UserProfile />} />
                       <Route path="/friends" element={<Friends />} />
+                      <Route path="/feed" element={<Feed />} />
+                      <Route path="/stories" element={<Stories />} />
                       <Route path="/chat" element={<Chat />} />
                       <Route path="/groups" element={<Groups />} />
                       <Route path="/payments" element={<PaymentHistory />} />
