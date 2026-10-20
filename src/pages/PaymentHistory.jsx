@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { FiCheck, FiX, FiUsers, FiClock, FiCreditCard, FiTrash2 } from "react-icons/fi";
 import InlineLoader from "../components/InlineLoader";
+import Skeleton from "../components/Skeleton";
 
 const fmtDate = (d) => (d ? new Date(d).toLocaleDateString() : "—");
 
@@ -248,7 +249,7 @@ export default function PaymentHistory() {
   const activeCount = dedupedSubs.filter((s) => s.status === "active" && !s.isExpired).length;
   const pendingCount = dedupedSubs.filter((s) => s.status === "pending").length;
 
-  if (loading) return <InlineLoader label="Loading payments..." />;
+  if (loading) return <div className="mt-6 space-y-3"><Skeleton className="h-12 w-full" count={5} /></div>;
 
   return (
     <div className="mt-6 space-y-10">
@@ -286,7 +287,7 @@ export default function PaymentHistory() {
             </div>
           </div>
 
-          {allLoading && <InlineLoader label="Loading subscribers..." compact />}
+          {allLoading && <div className="space-y-2"><Skeleton className="h-10 w-full" count={4} /></div>}
           {!allLoading && dedupedSubs.length === 0 && (
             <p className="text-slate-500">No subscribers yet.</p>
           )}

@@ -39,11 +39,15 @@ export default function Profile() {
       showToast("Full name cannot be empty", "error");
       return;
     }
+    if (form.fullname.trim().length > 80) {
+      showToast("Full name must be at most 80 characters", "error");
+      return;
+    }
     setLoading(true);
     try {
       const fd = new FormData();
-      fd.append("fullname", form.fullname);
-      fd.append("address", form.address);
+      fd.append("fullname", form.fullname.trim());
+      fd.append("address", form.address.trim());
       if (file) fd.append("avatar", file);
       await updateProfile(fd);
       showToast("Profile updated successfully!", "success");

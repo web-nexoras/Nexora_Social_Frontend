@@ -19,6 +19,8 @@ export default function Signup() {
     const errors = {};
     if (!form.fullname.trim()) {
       errors.fullname = "Full name is required";
+    } else if (form.fullname.trim().length > 80) {
+      errors.fullname = "Full name must be at most 80 characters";
     }
     if (!form.email.trim()) {
       errors.email = "Email is required";
@@ -51,7 +53,7 @@ export default function Signup() {
     setLoading(true);
 
     try {
-      const data = await signup(form.fullname, form.email, form.password);
+      const data = await signup(form.fullname.trim(), form.email.trim(), form.password);
       showToast("Account created successfully! Please verify your email with the OTP.", "success");
       navigate("/verify-otp", { state: { email: form.email, devOtp: data?.devOtp } });
     } catch (err) {
@@ -60,8 +62,8 @@ export default function Signup() {
         setFieldErrors((prev) => ({ ...prev, email: "An account with this email already exists" }));
       } else {
         setGeneralError(msg);
+        showToast(msg, "error");
       }
-      showToast(msg, "error");
     } finally {
       setLoading(false);
     }

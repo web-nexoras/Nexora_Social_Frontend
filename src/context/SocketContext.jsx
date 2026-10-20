@@ -14,6 +14,8 @@ const SocketContext = createContext({
   showToast: () => {},
   dismissToast: () => {},
   goToChat: () => {},
+  unreadMessages: 0,
+  clearUnreadMessages: () => {},
 });
 
 const getSocketUserId = (payload) =>
@@ -39,6 +41,7 @@ export function SocketProvider({ children }) {
   const [socketConnected, setSocketConnected] = useState(false);
   const [onlineIds, setOnlineIds] = useState(() => new Set());
   const [toast, setToast] = useState(null);
+  const [unreadMessages, setUnreadMessages] = useState(0);
   const toastTimer = useRef(null);
 
   useEffect(() => {
@@ -113,6 +116,7 @@ export function SocketProvider({ children }) {
 
       const convId = getConversationId(msg);
       setToast({ convId, text: `New message from ${msg.sender?.fullname || "Someone"}` });
+      setUnreadMessages((c) => c + 1);
       if (toastTimer.current) clearTimeout(toastTimer.current);
       toastTimer.current = setTimeout(() => setToast(null), 4000);
     });
@@ -141,9 +145,10 @@ export function SocketProvider({ children }) {
     else navigate("/chat");
     dismissToast();
   };
+  const clearUnreadMessages = () => setUnreadMessages(0);
 
   return (
-    <SocketContext.Provider value={{ socket, socketConnected, onlineIds, toast, showToast, dismissToast, goToChat }}>
+    <SocketContext.Provider value={{ socket, socketConnected, onlineIds, toast, showToast, dismissToast, goToChat, unreadMessages, clearUnreadMessages }}>
       {children}
       {toast && (
         <div

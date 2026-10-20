@@ -2,11 +2,13 @@ import React from "react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
+import { useSocket } from "../context/SocketContext";
 import {
   FiHome,
   FiUser,
   FiUsers,
   FiMessageSquare,
+  FiBell,
   FiRss,
   FiCamera,
   FiTag,
@@ -27,6 +29,7 @@ const linkClass = ({ isActive }) =>
 export default function Sidebar({ onNavigate }) {
   const { user } = useAuth();
   const { theme, setTheme } = useTheme();
+  const { unreadMessages } = useSocket();
 
   return (
     <aside className="neo-raised app-sidebar p-4 flex-1 min-h-screen overflow-y-auto flex flex-col" onClick={onNavigate}>
@@ -54,6 +57,14 @@ export default function Sidebar({ onNavigate }) {
         </NavLink>
         <NavLink to="/chat" className={linkClass}>
           <FiMessageSquare className="shrink-0" /> Messages
+          {unreadMessages > 0 && (
+            <span className="ml-auto inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-red-500 text-white text-xs font-bold">
+              {unreadMessages > 99 ? "99+" : unreadMessages}
+            </span>
+          )}
+        </NavLink>
+        <NavLink to="/notifications" className={linkClass}>
+          <FiBell className="shrink-0" /> Notifications
         </NavLink>
         <NavLink to="/groups" className={linkClass}>
           <FiTag className="shrink-0" /> Groups

@@ -7,6 +7,7 @@ export const authApi = {
   resendOtp: (email) => api.post("/auth/resend-otp", { email }),
   signin: (email, password) => api.post("/auth/signin", { email, password }),
   signout: () => api.post("/auth/signout"),
+  refreshToken: () => api.post("/auth/refresh-token"),
   getProfile: () => api.get("/auth/me"),
   updateProfile: (formData) => api.put("/auth/me", formData),
   forgotPassword: (email) => api.post("/auth/forgot-password", { email }),

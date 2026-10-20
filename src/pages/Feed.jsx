@@ -3,6 +3,7 @@ import { postsApi } from "../api/postsApi";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { FiHeart, FiMessageCircle, FiShare2, FiBookmark, FiImage, FiSend, FiMoreHorizontal } from "react-icons/fi";
+import Skeleton from "../components/Skeleton";
 
 const REACTIONS = ["like", "love", "haha", "wow", "sad", "angry"];
 
@@ -263,6 +264,11 @@ export default function Feed() {
         <button onClick={() => loadFeed(cursor)} disabled={loading} className="w-full py-2 rounded-lg bg-slate-100 hover:bg-slate-200">
           {loading ? "Loading..." : "Load more"}
         </button>
+      )}
+      {loading && posts.length === 0 && (
+        <div className="space-y-4">
+          <Skeleton className="h-48 w-full" count={3} />
+        </div>
       )}
       {!loading && posts.length === 0 && <p className="text-center text-slate-500">No posts yet. Be the first!</p>}
     </div>

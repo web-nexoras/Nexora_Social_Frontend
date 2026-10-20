@@ -24,6 +24,10 @@ export default function VerifyOtp() {
     setError("");
     setMsg("");
 
+    if (!email.trim()) {
+      setError("Email not found. Please sign up again.");
+      return;
+    }
     if (!otp.trim() || otp.trim().length !== 6) {
       setOtpError("Please enter the complete 6-digit OTP code");
       return;

@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { FiCheck, FiX } from "react-icons/fi";
 import InlineLoader from "../components/InlineLoader";
+import Skeleton from "../components/Skeleton";
 
 export default function AdminUsers() {
   const { user } = useAuth();
@@ -106,7 +107,7 @@ export default function AdminUsers() {
         ))}
       </div>
 
-      {loading && <InlineLoader label="Loading users..." compact />}
+      {loading && <div className="space-y-2"><Skeleton className="h-10 w-full" count={6} /></div>}
 
       <div className="bg-white rounded-2xl shadow overflow-x-auto">
         <table className="w-full text-sm min-w-[640px]">

@@ -44,7 +44,7 @@ export default function Login() {
     setLoading(true);
 
     try {
-      await login(email, password);
+      await login(email.trim(), password);
       showToast("Signed in successfully! Welcome back.", "success");
       navigate("/dashboard");
     } catch (err) {
@@ -61,11 +61,7 @@ export default function Login() {
       } else if (isRejected) {
         setGeneralError("Your account was rejected by the administrator. Contact support for assistance.");
         showToast("Account rejected by administrator.", "error", 6000);
-      } else if (msg.toLowerCase().includes("email") || msg.toLowerCase().includes("password")) {
-        setFieldErrors({
-          email: "Please check your email",
-          password: "Or check your password",
-        });
+      } else if (msg.toLowerCase().includes("invalid")) {
         setGeneralError("Invalid email or password");
         showToast("Invalid email or password", "error");
       } else {

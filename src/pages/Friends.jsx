@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { friendsApi } from "../api/friendsApi";
 import { useToast } from "../context/ToastContext";
 import InlineLoader from "../components/InlineLoader";
+import Skeleton from "../components/Skeleton";
 
 const TABS = ["Suggestions", "Incoming", "Sent", "Friends"];
 
@@ -91,7 +92,7 @@ export default function Friends() {
     }
   };
 
-  if (loading) return <InlineLoader label="Loading friends..." />;
+  if (loading) return <div className="mt-6 space-y-3"><Skeleton className="h-12 w-full" count={5} /></div>;
 
   return (
     <div className="grid md:grid-cols-4 gap-6 mt-6">
@@ -129,12 +130,12 @@ export default function Friends() {
             {suggestions.length === 0 && <p className="text-slate-500 text-sm">No users found</p>}
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {suggestions.map((u) => (
-                <div key={u._id} className="bg-white rounded-2xl shadow p-4 hover:shadow-lg transition">
+                <div key={u._id} className="bg-white rounded-2xl shadow p-4 hover:shadow-lg transition overflow-hidden">
                   <Link to={`/user/${u._id}`} className="flex items-center gap-3 mb-3">
                     <img src={u.avatar || "https://via.placeholder.com/48"} alt={u.fullname} className="w-12 h-12 rounded-full object-cover" />
-                    <div>
-                      <p className="font-semibold text-slate-800 hover:text-brand">{u.fullname}</p>
-                      <p className="text-xs text-slate-400">{u.email}</p>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-slate-800 hover:text-brand truncate">{u.fullname}</p>
+                      <p className="text-xs text-slate-400 truncate">{u.email}</p>
                     </div>
                   </Link>
                   <button onClick={() => sendRequest(u._id)} className="w-full py-1.5 rounded-lg bg-brand text-white text-sm font-medium hover:bg-indigo-700 transition">
@@ -152,12 +153,12 @@ export default function Friends() {
             {incoming.length === 0 && <p className="text-slate-500 text-sm">No incoming requests</p>}
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {incoming.map((r) => (
-                <div key={r._id} className="bg-white rounded-2xl shadow p-4 hover:shadow-lg transition">
+                <div key={r._id} className="bg-white rounded-2xl shadow p-4 hover:shadow-lg transition overflow-hidden">
                   <div className="flex items-center gap-3 mb-3">
                     <img src={r.sender?.avatar || "https://via.placeholder.com/48"} alt={r.sender?.fullname} className="w-12 h-12 rounded-full object-cover" />
-                    <div>
-                      <p className="font-semibold text-slate-800">{r.sender?.fullname}</p>
-                      <p className="text-xs text-slate-400">{r.sender?.email}</p>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-slate-800 truncate">{r.sender?.fullname}</p>
+                      <p className="text-xs text-slate-400 truncate">{r.sender?.email}</p>
                     </div>
                   </div>
                   <div className="flex gap-2">
@@ -180,12 +181,12 @@ export default function Friends() {
             {sent.length === 0 && <p className="text-slate-500 text-sm">No sent requests</p>}
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {sent.map((r) => (
-                <div key={r._id} className="bg-white rounded-2xl shadow p-4 hover:shadow-lg transition">
+                <div key={r._id} className="bg-white rounded-2xl shadow p-4 hover:shadow-lg transition overflow-hidden">
                   <div className="flex items-center gap-3 mb-3">
                     <img src={r.receiver?.avatar || "https://via.placeholder.com/48"} alt={r.receiver?.fullname} className="w-12 h-12 rounded-full object-cover" />
-                    <div>
-                      <p className="font-semibold text-slate-800">{r.receiver?.fullname}</p>
-                      <p className="text-xs text-slate-400">{r.receiver?.email}</p>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-slate-800 truncate">{r.receiver?.fullname}</p>
+                      <p className="text-xs text-slate-400 truncate">{r.receiver?.email}</p>
                     </div>
                   </div>
                   <button onClick={() => cancel(r._id)} className="w-full py-1.5 rounded-lg bg-slate-500 text-white text-sm font-medium hover:bg-slate-600 transition">
@@ -203,12 +204,12 @@ export default function Friends() {
             {friends.length === 0 && <p className="text-slate-500 text-sm">No friends yet</p>}
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {friends.map((f) => (
-                <div key={f.friendshipId} className="bg-white rounded-2xl shadow p-4 hover:shadow-lg transition">
+                <div key={f.friendshipId} className="bg-white rounded-2xl shadow p-4 hover:shadow-lg transition overflow-hidden">
                   <Link to={`/user/${f.friend?._id}`} className="flex items-center gap-3 mb-3">
                     <img src={f.friend?.avatar || "https://via.placeholder.com/48"} alt={f.friend?.fullname} className="w-12 h-12 rounded-full object-cover" />
-                    <div>
-                      <p className="font-semibold text-slate-800 hover:text-brand">{f.friend?.fullname}</p>
-                      <p className="text-xs text-slate-400">{f.friend?.email}</p>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-slate-800 hover:text-brand truncate">{f.friend?.fullname}</p>
+                      <p className="text-xs text-slate-400 truncate">{f.friend?.email}</p>
                     </div>
                   </Link>
                   <div className="flex gap-2">

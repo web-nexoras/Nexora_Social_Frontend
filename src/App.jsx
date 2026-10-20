@@ -8,6 +8,7 @@ import PublicLayout from "./components/PublicLayout";
 import DashboardShell from "./components/DashboardShell";
 import ProtectedRoute from "./components/ProtectedRoute";
 import InlineLoader from "./components/InlineLoader";
+import Skeleton from "./components/Skeleton";
 
 const Home = lazy(() => import("./pages/Home"));
 const Login = lazy(() => import("./pages/Login"));
@@ -27,6 +28,7 @@ const PaymentCancel = lazy(() => import("./pages/PaymentCancel"));
 const AdminGroups = lazy(() => import("./pages/AdminGroups"));
 const AdminUsers = lazy(() => import("./pages/AdminUsers"));
 const PaymentHistory = lazy(() => import("./pages/PaymentHistory"));
+const Notifications = lazy(() => import("./pages/Notifications"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const AuthCallback = lazy(() => import("./pages/AuthCallback"));
@@ -76,7 +78,15 @@ export default function App() {
             <ToastProvider>
               <RouteErrorBoundary>
                 <Suspense
-                  fallback={<InlineLoader label="Opening page..." />}
+                  fallback={
+                    <div className="min-h-screen flex items-center justify-center p-6">
+                      <div className="w-full max-w-md space-y-3">
+                        <Skeleton className="h-12 w-full" />
+                        <Skeleton className="h-12 w-5/6" />
+                        <Skeleton className="h-12 w-2/3" />
+                      </div>
+                    </div>
+                  }
                 >
                   <Routes>
                     {/* Auth pages — clean, full screen, no navbar */}
@@ -114,6 +124,7 @@ export default function App() {
                       <Route path="/chat" element={<Chat />} />
                       <Route path="/groups" element={<Groups />} />
                       <Route path="/payments" element={<PaymentHistory />} />
+                      <Route path="/notifications" element={<Notifications />} />
                       <Route path="/admin/users" element={<AdminUsers />} />
                       <Route path="/admin/groups" element={<AdminGroups />} />
                     </Route>

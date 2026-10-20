@@ -6,6 +6,7 @@ import { friendsApi } from "../api/friendsApi";
 import { followsApi } from "../api/followsApi";
 import { useToast } from "../context/ToastContext";
 import InlineLoader from "../components/InlineLoader";
+import Skeleton from "../components/Skeleton";
 
 export default function UserProfile() {
   const { id } = useParams();
@@ -74,7 +75,7 @@ export default function UserProfile() {
   };
 
   if (loading) {
-    return <InlineLoader label="Loading profile..." />;
+    return <div className="max-w-3xl mx-auto mt-6 px-4 space-y-3"><Skeleton className="h-40 w-full" /><Skeleton className="h-12 w-1/2" /><Skeleton className="h-12 w-full" /></div>;
   }
 
   if (!user) {
@@ -116,7 +117,14 @@ export default function UserProfile() {
 
         {/* Card Content */}
         <div className="px-4 sm:px-6 md:px-8 pb-6 sm:pb-8">
-          <div className="-mt-12 sm:-mt-14 mb-5 sm:mb-6">
+          <div className="-mt-12 sm:-mt-14 mb-5 sm:mb-6 flex items-end gap-3">
+            <button
+              onClick={() => navigate(-1)}
+              className="mb-2 inline-flex items-center justify-center w-10 h-10 rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 transition shrink-0"
+              title="Back"
+            >
+              <FiArrowLeft />
+            </button>
             {/* Avatar with fallback to clean initials — z-10 so it paints over the banner */}
             <div className="relative z-10 w-24 h-24 sm:w-28 sm:h-28 rounded-full border-4 border-white shadow-2xl overflow-hidden bg-slate-900 shrink-0">
               {user.avatar && !imgError ? (
@@ -237,13 +245,6 @@ export default function UserProfile() {
                 {following ? "Following" : "Follow"}
               </button>
             )}
-
-            <button
-              onClick={() => navigate(-1)}
-              className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-slate-100 text-slate-700 text-sm font-semibold hover:bg-slate-200 transition ml-auto"
-            >
-              <FiArrowLeft /> Back
-            </button>
           </div>
         </div>
       </div>

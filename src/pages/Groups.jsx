@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { groupsApi } from "../api/groupsApi";
 import { useAuth } from "../context/AuthContext";
 import InlineLoader from "../components/InlineLoader";
+import Skeleton from "../components/Skeleton";
 
 export default function Groups() {
   const { user } = useAuth();
@@ -38,7 +39,7 @@ export default function Groups() {
     navigate(`/chat?conversation=${convId}`);
   };
 
-  if (loading) return <InlineLoader label="Loading groups..." />;
+  if (loading) return <div className="mt-6 space-y-3"><Skeleton className="h-16 w-full" count={4} /></div>;
 
   return (
     <div className="mt-6">
