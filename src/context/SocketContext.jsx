@@ -234,6 +234,9 @@ export function SocketProvider({ children }) {
       const isMine = String(senderId) === String(user?._id);
       if (isMine) return;
 
+      // Call-log bubbles are history, not a real message — no popup/sound.
+      if (msg.callMeta?.status) return;
+
       try {
         const AudioContextClass = window.AudioContext || window.webkitAudioContext;
         if (!AudioContextClass) throw new Error("Audio playback is unavailable");

@@ -120,6 +120,14 @@ export default function Chat() {
   const remoteStreamRef = useRef(null);
   const answeredRef = useRef(false);
   const ringTimeoutRef = useRef(null);
+  // Call-log tracking (the caller records the call in the conversation)
+  const isCallInitiatorRef = useRef(false);
+  const callLoggedRef = useRef(false);
+  const callStartedAtRef = useRef(null);
+  const callSecondsRef = useRef(0);
+  const endReasonRef = useRef(null);
+  const activeConvRef = useRef(null);
+  const otherParticipantRef = useRef(null);
 
   const fmtTime = (s) =>
     `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
@@ -136,6 +144,10 @@ export default function Chat() {
     const t = setInterval(() => setCallSeconds((s) => s + 1), 1000);
     return () => clearInterval(t);
   }, [callPhase]);
+
+  useEffect(() => {
+    callSecondsRef.current = callSeconds;
+  }, [callSeconds]);
 
   const loadConversations = async () => {
     try {
@@ -172,6 +184,10 @@ export default function Chat() {
       await pc.setLocalDescription(offer);
       socket.emit("call:offer", { to: otherParticipant._id, offer, callType: kind });
       answeredRef.current = false;
+      isCallInitiatorRef.current = true;
+      callLoggedRef.current = false;
+      endReasonRef.current = null;
+      callStartedAtRef.current = Date.now();
       setInCall(true);
       setCallPhase("calling"); // ringing — not connected yet
       setCallType(kind);
@@ -218,6 +234,9 @@ export default function Chat() {
       socket.emit("call:answer", { to: incomingCall.from, answer });
       await flushIce(); // candidates that arrived while it was still ringing
       answeredRef.current = true;
+      isCallInitiatorRef.current = false; // we are the callee — caller logs the call
+      callLoggedRef.current = true;
+      callStartedAtRef.current = Date.now();
       setInCall(true);
       setCallPhase("connected");
       setCallType(incomingCall.callType === "video" ? "video" : "audio");
@@ -236,6 +255,24 @@ export default function Chat() {
   };
 
   const endCall = (notify = true) => {
+    const finalPhase = callPhaseRef.current;
+    // Caller records the finished call in the conversation (call log bubble).
+    if (isCallInitiatorRef.current && !callLoggedRef.current && socket && activeConvRef.current?._id) {
+      callLoggedRef.current = true;
+      const status =
+        finalPhase === "connected"
+          ? "completed"
+          : endReasonRef.current === "declined"
+            ? "declined"
+            : "missed";
+      socket.emit("call:log", {
+        conversationId: activeConvRef.current._id,
+        callType,
+        status,
+        durationSec: finalPhase === "connected" ? callSecondsRef.current : 0,
+        startedAt: callStartedAtRef.current || Date.now(),
+      });
+    }
     if (ringTimeoutRef.current) clearTimeout(ringTimeoutRef.current);
     stopRing();
     if (pcRef.current) pcRef.current.close();
@@ -254,7 +291,7 @@ export default function Chat() {
     setCallSeconds(0);
     setMuted(false);
     setCamOff(false);
-    const to = incomingCall?.from || otherParticipant?._id;
+    const to = incomingCall?.from || otherParticipantRef.current?._id;
     clearIncomingCall();
     setCallPendingAccept(false);
     // notify=false when the remote side already told us the call ended
@@ -583,6 +620,7 @@ export default function Chat() {
       }
     };
     const onCallEnd = ({ reason } = {}) => {
+      endReasonRef.current = reason || null;
       // Tell the caller why it stopped while the call was still ringing out.
       if (callPhaseRef.current === "calling") {
         showToast(reason === "declined" ? "Call declined" : "No answer — call ended", "info");
@@ -803,6 +841,14 @@ export default function Chat() {
   const otherParticipant =
     activeConv?.participants?.find((p) => p._id !== user?._id) ||
     activeConv?.participants?.[0];
+
+  // Fresh mirrors for call handlers registered once on the socket.
+  useEffect(() => {
+    activeConvRef.current = activeConv;
+  }, [activeConv]);
+  useEffect(() => {
+    otherParticipantRef.current = otherParticipant;
+  }, [otherParticipant]);
   const isOtherOnline = Boolean(
     otherParticipant && onlineIds.has(otherParticipant._id),
   );
@@ -1394,7 +1440,33 @@ export default function Chat() {
                   <div className="max-w-[75%]">
                     <div className="space-y-1">
                       {group.messages.map((m) =>
-                        editingId === m._id ? (
+                        m.callMeta?.status ? (
+                          /* Call-history bubble (centered pill) */
+                          <div key={m._id} className="flex justify-center py-1">
+                            <div className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs shadow-sm text-slate-500">
+                              {m.callMeta.status === "missed" ? (
+                                <FiPhoneOff className="text-red-500 shrink-0" />
+                              ) : m.callMeta.callType === "video" ? (
+                                <FiVideo className="text-emerald-500 shrink-0" />
+                              ) : (
+                                <FiPhone className="text-emerald-500 shrink-0" />
+                              )}
+                              <span className="font-medium text-slate-600">
+                                {m.callMeta.status === "missed"
+                                  ? `Missed ${m.callMeta.callType === "video" ? "video" : "voice"} call`
+                                  : m.callMeta.status === "declined"
+                                    ? `${m.callMeta.callType === "video" ? "Video" : "Voice"} call declined`
+                                    : `${m.callMeta.callType === "video" ? "Video" : "Voice"} call`}
+                              </span>
+                              {m.callMeta.status === "completed" && m.callMeta.durationSec > 0 && (
+                                <span>· {fmtTime(m.callMeta.durationSec)}</span>
+                              )}
+                              <span className="text-slate-400">
+                                · {new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                              </span>
+                            </div>
+                          </div>
+                        ) : editingId === m._id ? (
                           <div key={m._id} className="flex items-center gap-1">
                             <input
                               value={editText}

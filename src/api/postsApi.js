@@ -5,6 +5,14 @@ export const postsApi = {
     api.get("/posts/feed", { params: { cursor, limit } }),
   create: (formData) => api.post("/posts", formData),
   get: (id) => api.get(`/posts/${id}`),
+  update: (id, { text = "", images = [], removeImages = [] } = {}) => {
+    const fd = new FormData();
+    fd.append("text", text);
+    images.forEach((f) => fd.append("images", f));
+    if (removeImages.length) fd.append("removeImages", JSON.stringify(removeImages));
+    // Never set Content-Type manually — multipart needs the auto boundary
+    return api.put(`/posts/${id}`, fd);
+  },
   remove: (id) => api.delete(`/posts/${id}`),
   share: (id) => api.post(`/posts/${id}/share`),
   save: (id) => api.post(`/posts/${id}/save`),

@@ -169,3 +169,18 @@ select:not(.neo-input):focus {
 /* Active nav pills keep contrast */
 .dark .bg-brand { background-color: #3b4657; }
 .dark .text-brand { color: #cbd5e1; }
+
+/* Emoji reaction picker — staggered pop-in for each emoji */
+@keyframes emoji-pop {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.5);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.emoji-pop {
+  animation: emoji-pop 0.22s ease-out both;
+}
