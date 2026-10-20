@@ -27,6 +27,12 @@ import {
   FiVideo,
   FiSmile,
   FiBookmark,
+  FiInfo,
+  FiPhoneOff,
+  FiMic,
+  FiMicOff,
+  FiVideoOff,
+  FiMinimize2,
 } from "react-icons/fi";
 
 export default function Chat() {
@@ -50,7 +56,14 @@ export default function Chat() {
   const [mobileView, setMobileView] = useState("list");
   // highlighted state removed to avoid temporary color/border on new messages
   const [unreadIds, setUnreadIds] = useState(new Set());
-  const { socket, socketConnected, onlineIds, clearUnreadMessages } = useSocket();
+  const { socket, socketConnected, onlineIds, clearUnreadMessages, setChatOpen, incomingCall, clearIncomingCall, callPendingAccept, setCallPendingAccept, startRing, stopRing, attachPeer, detachPeer, flushIce } = useSocket();
+
+  // Mark chat as active while this screen is open — hides the chat-with-admin FAB
+  // so it never pops up over an ongoing conversation.
+  useEffect(() => {
+    setChatOpen(true);
+    return () => setChatOpen(false);
+  }, [setChatOpen]);
   const { showToast } = useToast();
   const [lockedGroup, setLockedGroup] = useState(null);
 
@@ -90,13 +103,39 @@ export default function Chat() {
   }, [avatarMenuId]);
   const [editingId, setEditingId] = useState(null);
   const [editText, setEditText] = useState("");
-  const [incomingCall, setIncomingCall] = useState(null);
+  // Call UI: inCall = media session exists, callPhase = "calling" (ringing out)
+  // or "connected" (answered).
   const [inCall, setInCall] = useState(false);
+  const [callPhase, setCallPhase] = useState(null);
+  const [callType, setCallType] = useState("audio");
+  const [callSeconds, setCallSeconds] = useState(0);
+  const [muted, setMuted] = useState(false);
+  const [camOff, setCamOff] = useState(false);
   const [callMinimized, setCallMinimized] = useState(false);
   const pcRef = useRef(null);
   const localStreamRef = useRef(null);
   const remoteAudioRef = useRef(null);
   const remoteVideoRef = useRef(null);
+  const localVideoRef = useRef(null);
+  const remoteStreamRef = useRef(null);
+  const answeredRef = useRef(false);
+  const ringTimeoutRef = useRef(null);
+
+  const fmtTime = (s) =>
+    `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+
+  // Live mirror of callPhase for socket handlers (avoids stale closures).
+  const callPhaseRef = useRef(null);
+  useEffect(() => {
+    callPhaseRef.current = callPhase;
+  }, [callPhase]);
+
+  // Call duration ticks only while the call is actually connected
+  useEffect(() => {
+    if (callPhase !== "connected") return;
+    const t = setInterval(() => setCallSeconds((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [callPhase]);
 
   const loadConversations = async () => {
     try {
@@ -107,45 +146,69 @@ export default function Chat() {
     }
   };
 
-  const startCall = async (callType) => {
+  const startCall = async (type) => {
     if (!socket || !otherParticipant?._id || activeConv?.type !== "direct") {
       showToast("Calls only available in direct chats", "info");
       return;
     }
+    if (inCall) return;
+    const kind = type === "video" ? "video" : "audio";
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: callType === "video" });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: kind === "video" });
       localStreamRef.current = stream;
       const pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
       pcRef.current = pc;
+      attachPeer(pc);
       stream.getTracks().forEach((t) => pc.addTrack(t, stream));
       pc.onicecandidate = (e) => {
         if (e.candidate) socket.emit("call:ice", { to: otherParticipant._id, candidate: e.candidate });
       };
       pc.ontrack = (e) => {
+        remoteStreamRef.current = e.streams[0];
         if (remoteVideoRef.current) remoteVideoRef.current.srcObject = e.streams[0];
         if (remoteAudioRef.current) remoteAudioRef.current.srcObject = e.streams[0];
       };
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
-      socket.emit("call:offer", { to: otherParticipant._id, offer, callType });
+      socket.emit("call:offer", { to: otherParticipant._id, offer, callType: kind });
+      answeredRef.current = false;
       setInCall(true);
+      setCallPhase("calling"); // ringing — not connected yet
+      setCallType(kind);
+      setCallSeconds(0);
+      setMuted(false);
+      setCamOff(false);
+      setCallMinimized(false);
+      if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+      startRing("ringback"); // ringback tone until the other side answers
+      if (ringTimeoutRef.current) clearTimeout(ringTimeoutRef.current);
+      ringTimeoutRef.current = setTimeout(() => {
+        if (!answeredRef.current) {
+          showToast("No answer — call ended", "info");
+          endCall();
+        }
+      }, 45000); // auto-cancel after 45s of ringing
     } catch (e) {
       showToast("Could not start call", "error");
     }
   };
 
   const acceptCall = async () => {
-    if (!incomingCall) return;
+    if (!incomingCall || inCall) return;
+    stopRing();
+    if (ringTimeoutRef.current) clearTimeout(ringTimeoutRef.current);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: incomingCall.callType === "video" });
       localStreamRef.current = stream;
       const pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
       pcRef.current = pc;
+      attachPeer(pc);
       stream.getTracks().forEach((t) => pc.addTrack(t, stream));
       pc.onicecandidate = (e) => {
         if (e.candidate) socket.emit("call:ice", { to: incomingCall.from, candidate: e.candidate });
       };
       pc.ontrack = (e) => {
+        remoteStreamRef.current = e.streams[0];
         if (remoteVideoRef.current) remoteVideoRef.current.srcObject = e.streams[0];
         if (remoteAudioRef.current) remoteAudioRef.current.srcObject = e.streams[0];
       };
@@ -153,23 +216,85 @@ export default function Chat() {
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
       socket.emit("call:answer", { to: incomingCall.from, answer });
+      await flushIce(); // candidates that arrived while it was still ringing
+      answeredRef.current = true;
       setInCall(true);
-      setIncomingCall(null);
+      setCallPhase("connected");
+      setCallType(incomingCall.callType === "video" ? "video" : "audio");
+      setCallSeconds(0);
+      setMuted(false);
+      setCamOff(false);
+      setCallMinimized(false);
+      if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+      clearIncomingCall();
+      setCallPendingAccept(false);
     } catch (e) {
       showToast("Could not accept call", "error");
+      stopRing();
+      setCallPendingAccept(false);
     }
   };
 
-  const endCall = () => {
+  const endCall = (notify = true) => {
+    if (ringTimeoutRef.current) clearTimeout(ringTimeoutRef.current);
+    stopRing();
     if (pcRef.current) pcRef.current.close();
     pcRef.current = null;
+    detachPeer();
     if (localStreamRef.current) localStreamRef.current.getTracks().forEach((t) => t.stop());
     localStreamRef.current = null;
+    if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
+    if (localVideoRef.current) localVideoRef.current.srcObject = null;
+    if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null;
+    remoteStreamRef.current = null;
     setInCall(false);
+    setCallPhase(null);
+    setCallType("audio");
     setCallMinimized(false);
-    setIncomingCall(null);
-    if (socket && otherParticipant?._id) socket.emit("call:end", { to: otherParticipant._id });
+    setCallSeconds(0);
+    setMuted(false);
+    setCamOff(false);
+    const to = incomingCall?.from || otherParticipant?._id;
+    clearIncomingCall();
+    setCallPendingAccept(false);
+    // notify=false when the remote side already told us the call ended
+    if (notify && socket && to) socket.emit("call:end", { to });
   };
+
+  const toggleMute = () => {
+    const next = !muted;
+    setMuted(next);
+    localStreamRef.current?.getAudioTracks().forEach((t) => (t.enabled = !next));
+  };
+
+  const toggleCam = () => {
+    const next = !camOff;
+    setCamOff(next);
+    localStreamRef.current?.getVideoTracks().forEach((t) => (t.enabled = !next));
+  };
+
+  // Global overlay pressed Accept → complete the WebRTC handshake here.
+  useEffect(() => {
+    if (callPendingAccept && incomingCall && !inCall) {
+      setCallPendingAccept(false);
+      acceptCall();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [callPendingAccept, incomingCall, inCall]);
+
+  // Video elements mount only once the call connects (or the minimized bar is
+  // reopened) — re-attach the streams whenever that happens.
+  useEffect(() => {
+    if (localVideoRef.current && localStreamRef.current) {
+      localVideoRef.current.srcObject = localStreamRef.current;
+    }
+    if (remoteVideoRef.current && remoteStreamRef.current) {
+      remoteVideoRef.current.srcObject = remoteStreamRef.current;
+    }
+    if (remoteAudioRef.current && remoteStreamRef.current) {
+      remoteAudioRef.current.srcObject = remoteStreamRef.current;
+    }
+  }, [inCall, callPhase, callMinimized, callType]);
 
   const handleSearch = async (q) => {
     setSearchQuery(q);
@@ -442,20 +567,30 @@ export default function Chat() {
     socket.on("conversation:deleted", onConversationDeleted);
     socket.on("message:updated", onMessageUpdated);
 
-    const onCallOffer = async ({ from, offer, callType }) => {
-      setIncomingCall({ from, offer, callType });
-    };
+    // call:offer + call:ice are handled globally by SocketContext (so the
+    // incoming call screen shows on any page and early ICE is buffered).
     const onCallAnswer = async ({ answer }) => {
-      if (pcRef.current) await pcRef.current.setRemoteDescription(new RTCSessionDescription(answer));
+      try {
+        if (pcRef.current) await pcRef.current.setRemoteDescription(new RTCSessionDescription(answer));
+        answeredRef.current = true;
+        if (ringTimeoutRef.current) clearTimeout(ringTimeoutRef.current);
+        stopRing();
+        await flushIce();
+        setCallPhase("connected");
+        setCallSeconds(0);
+      } catch {
+        /* ignore malformed answers */
+      }
     };
-    const onCallIce = async ({ candidate }) => {
-      if (pcRef.current && candidate) await pcRef.current.addIceCandidate(new RTCIceCandidate(candidate));
+    const onCallEnd = ({ reason } = {}) => {
+      // Tell the caller why it stopped while the call was still ringing out.
+      if (callPhaseRef.current === "calling") {
+        showToast(reason === "declined" ? "Call declined" : "No answer — call ended", "info");
+      }
+      endCall(false); // remote side hung up — don't echo
     };
-    const onCallEnd = () => endCall();
 
-    socket.on("call:offer", onCallOffer);
     socket.on("call:answer", onCallAnswer);
-    socket.on("call:ice", onCallIce);
     socket.on("call:end", onCallEnd);
 
     return () => {
@@ -463,9 +598,7 @@ export default function Chat() {
       socket.off("message:deleted", onMessageDeleted);
       socket.off("conversation:deleted", onConversationDeleted);
       socket.off("message:updated", onMessageUpdated);
-      socket.off("call:offer", onCallOffer);
       socket.off("call:answer", onCallAnswer);
-      socket.off("call:ice", onCallIce);
       socket.off("call:end", onCallEnd);
     };
   }, [socket]);
@@ -835,10 +968,10 @@ export default function Chat() {
         />
       )}
 
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col h-[calc(100dvh-4rem)] gap-3 overflow-hidden">
         {/* Conversation list */}
         <div
-          className={`bg-white rounded-2xl shadow p-4 h-[calc(100dvh-6rem)] overflow-y-auto ${activeId ? "hidden" : "block"}`}
+          className={`bg-white rounded-2xl shadow p-4 flex-1 min-h-0 overflow-y-auto overflow-x-hidden ${activeId ? "hidden" : "block"}`}
         >
           {/* Search */}
           <div className="relative mb-3">
@@ -847,7 +980,7 @@ export default function Chat() {
               value={searchQuery}
               onChange={(e) => handleSearch(e.target.value)}
               placeholder="Search people..."
-              className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-brand"
+              className="w-full pl-9 pr-3 py-2 rounded-xl neo-input text-sm focus:ring-2 focus:ring-brand"
             />
           </div>
 
@@ -988,7 +1121,7 @@ export default function Chat() {
 
         {/* Chat window */}
         <div
-          className={`bg-white rounded-2xl shadow flex flex-col h-[calc(100dvh-6rem)] min-h-[20rem] ${activeId ? "flex" : "hidden"}`}
+          className={`bg-white rounded-2xl shadow flex flex-col flex-1 min-h-0 overflow-hidden ${activeId ? "flex" : "hidden"}`}
         >
           <div className="pl-2 pr-6 py-4 border-b flex items-center gap-3">
             <button
@@ -1013,7 +1146,7 @@ export default function Chat() {
                   navigate(`/user/${otherParticipant._id}`);
                 }
               }}
-              className="text-xl font-bold text-brand"
+              className="text-xl font-bold text-brand flex items-center gap-2"
             >
               {lockedGroup
                 ? lockedGroup.name
@@ -1022,7 +1155,29 @@ export default function Chat() {
                     ? activeConv.groupName
                     : otherParticipant?.fullname
                   : ""}
+              {activeConv && activeConv.type !== "group" && otherParticipant && (
+                <span
+                  title={isOtherOnline ? "Active now" : "Offline"}
+                  className={`inline-flex items-center gap-1.5 text-xs font-semibold ${
+                    isOtherOnline ? "text-green-600" : "text-slate-400"
+                  }`}
+                >
+                  <span
+                    className={`h-2.5 w-2.5 rounded-full ${
+                      isOtherOnline
+                        ? "bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.9)]"
+                        : "bg-slate-400"
+                    }`}
+                  />
+                  {isOtherOnline ? "Active" : "Offline"}
+                </span>
+              )}
             </button>
+            {lockedGroup && (
+              <span className="ml-2 inline-flex items-center gap-1 text-xs font-semibold text-slate-500">
+                <FiLock /> Not joined
+              </span>
+            )}
             {activeConv?.type === "direct" && otherParticipant && (
               <div className="ml-auto flex items-center gap-2">
                 <button onClick={() => startCall("audio")} className="p-2 rounded-full hover:bg-indigo-50 text-slate-600 hover:text-brand" title="Voice call">
@@ -1031,29 +1186,10 @@ export default function Chat() {
                 <button onClick={() => startCall("video")} className="p-2 rounded-full hover:bg-indigo-50 text-slate-600 hover:text-brand" title="Video call">
                   <FiVideo />
                 </button>
+                <button onClick={() => showToast("Info panel coming soon", "info")} className="p-2 rounded-full hover:bg-indigo-50 text-slate-600 hover:text-brand" title="Info">
+                  <FiInfo />
+                </button>
               </div>
-            )}
-            {lockedGroup && (
-              <span className="ml-2 inline-flex items-center gap-1 text-xs font-semibold text-slate-500">
-                <FiLock /> Not joined
-              </span>
-            )}
-            {activeConv && activeConv.type !== "group" && otherParticipant && (
-              <span
-                title={isOtherOnline ? "Active now" : "Offline"}
-                className={`inline-flex items-center gap-1.5 text-xs font-semibold ${
-                  isOtherOnline ? "text-green-600" : "text-slate-400"
-                }`}
-              >
-                <span
-                  className={`h-2.5 w-2.5 rounded-full ${
-                    isOtherOnline
-                      ? "bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.9)]"
-                      : "bg-slate-400"
-                  }`}
-                />
-                {isOtherOnline ? "Active" : "Offline"}
-              </span>
             )}
             {!socketConnected && (
               <span className="ml-auto shrink-0 text-xs font-medium text-amber-600" role="status">
@@ -1069,37 +1205,177 @@ export default function Chat() {
               </button>
             )}
           </div>
-          {incomingCall && (
-            <div className="fixed inset-0 z-[80] bg-black/60 flex items-center justify-center p-4">
-              <div className="bg-white rounded-2xl p-6 w-full max-w-sm text-center space-y-4">
-                <p className="text-lg font-bold text-brand">Incoming {incomingCall.callType} call</p>
-                <div className="flex gap-3 justify-center">
-                  <button onClick={acceptCall} className="px-5 py-2 rounded-lg bg-green-500 text-white font-semibold">Accept</button>
-                  <button onClick={endCall} className="px-5 py-2 rounded-lg bg-red-500 text-white font-semibold">Reject</button>
+          {/* Outgoing call — "Calling…" ring screen (until the other side answers) */}
+          {inCall && callPhase === "calling" && (
+            <div className="fixed inset-0 z-[80] overflow-hidden text-white select-none">
+              <img
+                src={otherParticipant?.avatar || "https://via.placeholder.com/200"}
+                alt=""
+                className="absolute inset-0 w-full h-full object-cover scale-125 blur-3xl opacity-30"
+              />
+              <div className="absolute inset-0 bg-gradient-to-b from-[#0f172a]/85 via-[#1e1b4b]/90 to-[#020617]/95" />
+              <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-[520px] h-[520px] rounded-full bg-indigo-500/20 blur-[120px] pointer-events-none" />
+              <div className="relative h-full flex flex-col items-center justify-center px-6 py-10">
+                <div className="relative w-36 h-36 mb-9 shrink-0">
+                  <span className="absolute inset-0 rounded-full bg-indigo-400/30 animate-ping" />
+                  <span className="absolute -inset-4 rounded-full bg-indigo-400/20 animate-ping [animation-delay:300ms]" />
+                  <span className="absolute -inset-9 rounded-full bg-indigo-400/10 animate-ping [animation-delay:600ms]" />
+                  <img
+                    src={otherParticipant?.avatar || "https://via.placeholder.com/200"}
+                    alt=""
+                    className="relative w-36 h-36 rounded-full object-cover border-4 border-white/80 shadow-[0_0_60px_rgba(99,102,241,0.45)]"
+                  />
+                </div>
+                <p className="text-[11px] uppercase tracking-[0.35em] text-indigo-200/80 mb-3 text-center">
+                  Outgoing {callType === "video" ? "video" : "voice"} call
+                </p>
+                <h2 className="text-3xl font-extrabold mb-3 text-center drop-shadow-lg">{otherParticipant?.fullname || "…"}</h2>
+                <p className="flex items-center gap-2.5 text-sm text-white/60 mb-14">
+                  Calling
+                  <span className="flex gap-1 pb-0.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-white/70 animate-bounce" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-white/70 animate-bounce [animation-delay:150ms]" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-white/70 animate-bounce [animation-delay:300ms]" />
+                  </span>
+                </p>
+                <button onClick={() => endCall()} className="flex flex-col items-center gap-3 group" aria-label="Cancel call">
+                  <span className="w-[72px] h-[72px] rounded-full bg-gradient-to-br from-red-500 to-red-600 shadow-[0_10px_30px_rgba(239,68,68,0.45)] flex items-center justify-center transition group-hover:scale-105 group-active:scale-95">
+                    <FiPhoneOff className="w-8 h-8" />
+                  </span>
+                  <span className="text-xs text-white/70 group-hover:text-white transition">Cancel</span>
+                </button>
+                <p className="absolute bottom-8 text-[11px] text-white/35">Waiting for them to answer…</p>
+              </div>
+            </div>
+          )}
+          {/* Connected call — full screen with media + glass controls */}
+          {inCall && callPhase === "connected" && !callMinimized && (
+            <div className="fixed inset-0 z-[80] flex flex-col text-white bg-gradient-to-br from-[#0f172a] via-[#1e1b4b] to-[#020617] select-none">
+              <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full bg-indigo-500/10 blur-[130px]" />
+              </div>
+              {/* Header */}
+              <div className="relative flex items-center gap-3 px-4 sm:px-6 py-4 border-b border-white/10 bg-white/5 backdrop-blur-xl">
+                <img
+                  src={otherParticipant?.avatar || "https://via.placeholder.com/44"}
+                  alt=""
+                  className="w-11 h-11 rounded-full object-cover border-2 border-white/20"
+                />
+                <div className="min-w-0">
+                  <p className="font-semibold text-sm truncate drop-shadow">{otherParticipant?.fullname || "…"}</p>
+                  <p className="text-xs text-white/60 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    {fmtTime(callSeconds)}
+                  </p>
+                </div>
+                <span className="ml-auto text-[11px] px-3 py-1.5 rounded-full bg-white/10 backdrop-blur border border-white/15 text-white/80 font-medium">
+                  {callType === "video" ? "Video call" : "Voice call"}
+                </span>
+              </div>
+              {/* Media */}
+              <div className="relative flex-1 flex items-center justify-center p-4 sm:p-6 min-h-0">
+                {callType === "video" ? (
+                  <>
+                    <video
+                      ref={remoteVideoRef}
+                      autoPlay
+                      playsInline
+                      className="max-h-full max-w-full rounded-3xl bg-black object-contain shadow-[0_0_80px_rgba(0,0,0,0.6)] border border-white/10"
+                    />
+                    <video
+                      ref={localVideoRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      className={`absolute bottom-4 right-4 w-28 sm:w-44 aspect-[3/4] rounded-2xl object-cover border-2 border-white/25 shadow-[0_8px_30px_rgba(0,0,0,0.5)] -scale-x-100 transition ${camOff ? "opacity-0" : ""}`}
+                    />
+                  </>
+                ) : (
+                  <div className="relative w-44 h-44">
+                    <span className="absolute inset-0 rounded-full bg-indigo-400/25 animate-ping" />
+                    <span className="absolute -inset-5 rounded-full bg-indigo-400/15 animate-ping [animation-delay:300ms]" />
+                    <span className="absolute -inset-10 rounded-full bg-indigo-400/10 animate-ping [animation-delay:600ms]" />
+                    <img
+                      src={otherParticipant?.avatar || "https://via.placeholder.com/176"}
+                      alt=""
+                      className="relative w-44 h-44 rounded-full object-cover border-4 border-white/70 shadow-[0_0_70px_rgba(99,102,241,0.4)]"
+                    />
+                  </div>
+                )}
+              </div>
+              {/* Floating glass control bar */}
+              <div className="relative flex items-center justify-center px-4 pb-8 pt-4">
+                <div className="flex items-center gap-3 sm:gap-4 rounded-full bg-white/10 backdrop-blur-xl border border-white/15 px-5 py-3 shadow-[0_8px_40px_rgba(0,0,0,0.5)]">
+                  <button
+                    onClick={toggleMute}
+                    title={muted ? "Unmute" : "Mute"}
+                    className={`w-[54px] h-[54px] rounded-full flex items-center justify-center transition ${
+                      muted ? "bg-white text-red-500 shadow-[0_0_20px_rgba(255,255,255,0.25)]" : "bg-white/10 hover:bg-white/20"
+                    }`}
+                  >
+                    {muted ? <FiMicOff className="w-6 h-6" /> : <FiMic className="w-6 h-6" />}
+                  </button>
+                  {callType === "video" && (
+                    <button
+                      onClick={toggleCam}
+                      title={camOff ? "Turn camera on" : "Turn camera off"}
+                      className={`w-[54px] h-[54px] rounded-full flex items-center justify-center transition ${
+                        camOff ? "bg-white text-red-500 shadow-[0_0_20px_rgba(255,255,255,0.25)]" : "bg-white/10 hover:bg-white/20"
+                      }`}
+                    >
+                      {camOff ? <FiVideoOff className="w-6 h-6" /> : <FiVideo className="w-6 h-6" />}
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setCallMinimized(true)}
+                    title="Minimize"
+                    className="w-[54px] h-[54px] rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition"
+                  >
+                    <FiMinimize2 className="w-6 h-6" />
+                  </button>
+                  <button
+                    onClick={() => endCall()}
+                    title="End call"
+                    className="w-[54px] h-[54px] rounded-full bg-gradient-to-br from-red-500 to-red-600 shadow-[0_10px_30px_rgba(239,68,68,0.5)] flex items-center justify-center transition hover:scale-105 active:scale-95"
+                  >
+                    <FiPhoneOff className="w-6 h-6" />
+                  </button>
                 </div>
               </div>
             </div>
           )}
-          {inCall && !callMinimized && (
-            <div className="fixed inset-0 z-[80] bg-slate-900 flex flex-col items-center justify-center p-6 text-white">
-              <p className="text-2xl font-bold mb-2">In call</p>
-              <p className="text-slate-300 mb-6">{otherParticipant?.fullname}</p>
-              <video ref={remoteVideoRef} autoPlay playsInline className="w-full max-w-md rounded-xl bg-black mb-6" />
-              <div className="flex gap-3">
-                <button onClick={() => setCallMinimized(true)} className="px-5 py-2 rounded-lg bg-slate-700 text-white font-semibold">Chat</button>
-                <button onClick={endCall} className="px-5 py-2 rounded-lg bg-red-500 text-white font-semibold">End call</button>
+          {/* Minimized call bar */}
+          {inCall && callPhase === "connected" && callMinimized && (
+            <div className="fixed top-20 right-4 z-[80] flex items-center gap-3 rounded-2xl bg-slate-900/80 backdrop-blur-xl border border-white/10 shadow-[0_8px_40px_rgba(0,0,0,0.45)] px-4 py-3 text-white">
+              <img
+                src={otherParticipant?.avatar || "https://via.placeholder.com/40"}
+                alt=""
+                className="w-10 h-10 rounded-full object-cover border-2 border-white/20"
+              />
+              <div className="min-w-0">
+                <p className="text-sm font-semibold truncate max-w-[120px]">{otherParticipant?.fullname || "…"}</p>
+                <p className="text-xs text-emerald-300 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  {fmtTime(callSeconds)}
+                </p>
               </div>
-            </div>
-          )}
-          {inCall && callMinimized && (
-            <div className="fixed top-20 right-4 z-[80] bg-slate-900 text-white rounded-xl shadow-lg px-4 py-3 flex items-center gap-3">
-              <span className="text-sm font-semibold">In call</span>
-              <button onClick={() => setCallMinimized(false)} className="px-3 py-1.5 rounded-lg bg-slate-700 text-white text-sm">Open</button>
-              <button onClick={endCall} className="px-3 py-1.5 rounded-lg bg-red-500 text-white text-sm">End</button>
+              <button
+                onClick={() => setCallMinimized(false)}
+                className="px-3.5 py-1.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 text-white text-sm font-medium transition"
+              >
+                Open
+              </button>
+              <button
+                onClick={() => endCall()}
+                title="End call"
+                className="w-10 h-10 rounded-full bg-gradient-to-br from-red-500 to-red-600 shadow-[0_6px_20px_rgba(239,68,68,0.5)] flex items-center justify-center transition hover:scale-105 active:scale-95"
+              >
+                <FiPhoneOff className="w-4 h-4" />
+              </button>
             </div>
           )}
           <audio ref={remoteAudioRef} autoPlay playsInline className="hidden" />
-          <div ref={messagesContainerRef} className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 space-y-4">
+          <div ref={messagesContainerRef} className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 space-y-4 overflow-x-hidden">
             {loading && (
               <div className="space-y-3">
                 <Skeleton className="h-12 w-2/3" />
@@ -1255,12 +1531,12 @@ export default function Chat() {
               </button>
             </div>
           ) : (
-            <form onSubmit={sendMessage} className="p-4 border-t flex gap-2 shrink-0 bg-white">
+            <form onSubmit={sendMessage} className="p-4 border-t flex gap-2 shrink-0">
               <input
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 placeholder="Type a message..."
-                className="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-brand"
+                className="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-brand bg-slate-50"
               />
               <button
                 type="submit"

@@ -16,5 +16,5 @@ export const chatApi = {
   searchMessages: (conversationId, q) => api.get(`/chat/conversations/${conversationId}/search`, { params: { q } }),
   muteConversation: (conversationId) => api.post(`/chat/conversations/${conversationId}/mute`),
   archiveConversation: (conversationId) => api.post(`/chat/conversations/${conversationId}/archive`),
-  uploadMedia: (formData) => api.post("/chat/upload", formData, { headers: { "Content-Type": "multipart/form-data" } }),
+  uploadMedia: (formData) => api.post("/chat/upload", formData),
 };

@@ -5,7 +5,16 @@ import { useToast } from "../context/ToastContext";
 import { FiHeart, FiMessageCircle, FiShare2, FiBookmark, FiImage, FiSend, FiMoreHorizontal } from "react-icons/fi";
 import Skeleton from "../components/Skeleton";
 
-const REACTIONS = ["like", "love", "haha", "wow", "sad", "angry"];
+const REACTIONS = [
+  { key: "like", emoji: "👍", label: "Like" },
+  { key: "love", emoji: "❤️", label: "Love" },
+  { key: "haha", emoji: "😂", label: "Haha" },
+  { key: "wow", emoji: "😮", label: "Wow" },
+  { key: "sad", emoji: "😢", label: "Sad" },
+  { key: "angry", emoji: "😠", label: "Angry" },
+];
+
+const EMOJI = { like: "👍", love: "❤️", haha: "😂", wow: "😮", sad: "😢", angry: "😠" };
 
 export default function Feed() {
   const { user } = useAuth();
@@ -20,6 +29,10 @@ export default function Feed() {
   const [openComments, setOpenComments] = useState({});
   const [commentText, setCommentText] = useState({});
   const [comments, setComments] = useState({});
+  const [reactionModal, setReactionModal] = useState(null);
+  const [shareTarget, setShareTarget] = useState(null);
+  const [shareText, setShareText] = useState("");
+  const [sharing, setSharing] = useState(false);
   const fileRef = useRef();
 
   const loadFeed = async (nextCursor = null) => {
@@ -67,14 +80,16 @@ export default function Feed() {
   const handleReact = async (post, type) => {
     try {
       const res = await postsApi.react("post", post._id, type);
-      const action = res.data?.action;
+      const data = res.data || {};
       setPosts((prev) =>
         prev.map((p) => {
           if (p._id !== post._id) return p;
-          let count = p.likesCount || 0;
-          if (action === "added") count += 1;
-          if (action === "removed") count = Math.max(0, count - 1);
-          return { ...p, likesCount: count, myReaction: action === "removed" ? null : type };
+          return {
+            ...p,
+            likesCount: data.total ?? p.likesCount,
+            reactionCounts: data.reactionCounts || p.reactionCounts,
+            myReaction: data.myReaction ?? (data.action === "removed" ? null : type),
+          };
         }),
       );
     } catch (e) {
@@ -121,12 +136,28 @@ export default function Feed() {
     }
   };
 
-  const handleShare = async (post) => {
+  const handleShare = (post) => {
+    setShareTarget(post);
+    setShareText("");
+  };
+
+  const submitShare = async () => {
+    if (!shareTarget || sharing) return;
+    setSharing(true);
     try {
-      await postsApi.share(post._id);
-      showToast("Shared", "success");
+      const fd = new FormData();
+      fd.append("text", shareText.trim()); // caption optional — user decides
+      fd.append("sharedPostId", shareTarget._id);
+      const res = await postsApi.create(fd);
+      const newPost = res.data?.post;
+      if (newPost) setPosts((prev) => [newPost, ...prev]);
+      showToast("Shared to your feed", "success");
+      setShareTarget(null);
+      setShareText("");
     } catch (e) {
-      showToast("Failed", "error");
+      showToast(e?.response?.data?.message || "Failed to share", "error");
+    } finally {
+      setSharing(false);
     }
   };
 
@@ -143,15 +174,15 @@ export default function Feed() {
 
   return (
     <div className="max-w-2xl mx-auto py-6 px-4 space-y-6">
-      {/* Create post */}
-      <div className="bg-white rounded-2xl shadow p-4">
-        <form onSubmit={handleCreate} className="space-y-3">
+      {/* Create post — slim single-row style */}
+      <div className="bg-white rounded-2xl shadow px-4 pt-4 pb-2.5">
+        <form onSubmit={handleCreate} className="space-y-2">
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder="What's on your mind?"
-            className="w-full border rounded-lg p-3 resize-none focus:ring-2 focus:ring-brand"
-            rows={3}
+            className="w-full neo-input rounded-lg px-3 py-2 text-sm resize-none placeholder:text-slate-400"
+            rows={2}
           />
           {files.length > 0 && (
             <div className="flex gap-2 flex-wrap">
@@ -160,12 +191,12 @@ export default function Feed() {
               ))}
             </div>
           )}
-          <div className="flex items-center justify-between">
-            <button type="button" onClick={() => fileRef.current?.click()} className="flex items-center gap-2 text-slate-600 hover:text-brand">
+          <div className="flex items-center justify-between border-t pt-1.5">
+            <button type="button" onClick={() => fileRef.current?.click()} className="flex items-center gap-1.5 text-slate-600 hover:text-brand text-sm py-1">
               <FiImage /> Photo
             </button>
             <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => setFiles(Array.from(e.target.files || []))} />
-            <button type="submit" disabled={posting} className="px-4 py-2 rounded-lg bg-brand text-white font-semibold disabled:opacity-50">
+            <button type="submit" disabled={posting} className="px-3.5 py-1.5 rounded-lg bg-brand text-white text-sm font-semibold hover:opacity-90 disabled:opacity-50">
               {posting ? "Posting..." : "Post"}
             </button>
           </div>
@@ -193,6 +224,15 @@ export default function Feed() {
               )}
             </div>
             {post.text && <p className="whitespace-pre-wrap">{post.text}</p>}
+            {post.sharedPost && (
+              <div className="border rounded-lg p-3 bg-slate-50">
+                <p className="text-xs text-slate-500 mb-1">Shared post by {post.sharedPost?.author?.fullname || "User"}</p>
+                <p className="text-sm">{post.sharedPost?.text}</p>
+                {post.sharedPost?.attachments?.length > 0 && (
+                  <img src={post.sharedPost.attachments[0]} alt="" className="mt-2 rounded-lg w-full object-cover max-h-60" />
+                )}
+              </div>
+            )}
             {post.attachments?.length > 0 && (
               <div className="grid gap-2">
                 {post.attachments.map((url, i) => (
@@ -207,28 +247,62 @@ export default function Feed() {
                 ))}
               </div>
             )}
-            <div className="flex items-center justify-between text-sm text-slate-500 border-t pt-2">
-              <button onClick={() => handleReact(post, "like")} className="flex items-center gap-1 hover:text-brand">
-                <FiHeart /> {post.likesCount || 0}
-              </button>
-              <button onClick={() => toggleComments(post._id)} className="flex items-center gap-1 hover:text-brand">
+            {/* Single row: reactions + comment + share + save */}
+            <div className="flex items-center justify-between flex-wrap gap-y-1 border-t pt-2 text-sm text-slate-500">
+              {/* Reactions (left, compact) */}
+              <div className="flex items-center gap-1 flex-wrap">
+                {REACTIONS.map((r) => {
+                  const count = post.reactionCounts?.[r.key] || 0;
+                  return (
+                    <button
+                      key={r.key}
+                      onClick={() => handleReact(post, r.key)}
+                      title={r.label}
+                      className={`flex items-center gap-0 px-1 py-1 rounded-full transition transform hover:scale-125 ${
+                        post.myReaction === r.key ? "bg-indigo-100 text-brand font-semibold scale-110" : "hover:bg-slate-100"
+                      }`}
+                    >
+                      <span className="text-lg">{r.emoji}</span>
+                      {count > 0 && <span className="text-xs font-semibold">{count}</span>}
+                    </button>
+                  );
+                })}
+                {(() => {
+                  const total = REACTIONS.reduce((s, r) => s + (post.reactionCounts?.[r.key] || 0), 0);
+                  if (!total) return null;
+                  const label = post.myReaction
+                    ? total > 1
+                      ? `You and ${total - 1} other${total - 1 > 1 ? "s" : ""}`
+                      : "You"
+                    : `${total} ${total === 1 ? "person" : "people"} reacted`;
+                  return (
+                    <button
+                      onClick={() =>
+                        postsApi
+                          .reactions("post", post._id)
+                          .then((res) => setReactionModal({ post, data: res.data }))
+                          .catch(() => showToast("Failed to load reactions", "error"))
+                      }
+                      className="text-xs text-slate-500 hover:text-brand hover:underline ml-0.5 whitespace-nowrap"
+                    >
+                      {label}
+                    </button>
+                  );
+                })()}
+              </div>
+              {/* Comment (center) */}
+              <button onClick={() => toggleComments(post._id)} className="flex items-center gap-1 hover:text-brand px-2 py-1">
                 <FiMessageCircle /> {post.commentsCount || 0}
               </button>
-              <button onClick={() => handleShare(post)} className="flex items-center gap-1 hover:text-brand">
-                <FiShare2 /> {post.sharesCount || 0}
-              </button>
-              <button onClick={() => handleSave(post)} className="flex items-center gap-1 hover:text-brand">
-                <FiBookmark /> {post.savesCount || 0}
-              </button>
-            </div>
-
-            {/* Reactions quick */}
-            <div className="flex gap-2 flex-wrap">
-              {REACTIONS.map((r) => (
-                <button key={r} onClick={() => handleReact(post, r)} className="text-xs px-2 py-1 rounded bg-slate-100 hover:bg-slate-200">
-                  {r}
+              {/* Share + Save (right) */}
+              <div className="flex items-center gap-3">
+                <button onClick={() => handleShare(post)} className="flex items-center gap-1 hover:text-brand px-2 py-1">
+                  <FiShare2 /> {post.sharesCount || 0}
                 </button>
-              ))}
+                <button onClick={() => handleSave(post)} className="flex items-center gap-1 hover:text-brand px-2 py-1">
+                  <FiBookmark /> {post.savesCount || 0}
+                </button>
+              </div>
             </div>
 
             {/* Comments */}
@@ -259,6 +333,80 @@ export default function Feed() {
           </div>
         );
       })}
+
+      {reactionModal && (
+        <div className="fixed inset-0 z-[80] bg-black/50 flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white rounded-2xl neo-modal p-4 sm:p-5 w-full max-w-md max-h-[75vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-bold text-brand">Reactions ({reactionModal.data?.total || 0})</h3>
+              <button onClick={() => setReactionModal(null)} className="text-slate-500 hover:text-slate-800">✕</button>
+            </div>
+            {Object.entries(reactionModal.data?.grouped || {}).map(([type, users]) => (
+              <div key={type} className="mb-3">
+                <p className="text-sm font-semibold text-slate-700 mb-1">{EMOJI[type] || type} {users.length}</p>
+                <div className="space-y-1">
+                  {(users || []).map((u) => (
+                    <div key={u._id} className="flex items-center gap-2">
+                      <img src={u.avatar || "https://via.placeholder.com/24"} alt="" className="w-7 h-7 rounded-full object-cover" />
+                      <span className="text-sm text-slate-800">{u.fullname}</span>
+                      {u._id === user?._id && <span className="text-xs text-slate-400">(You)</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+            {!reactionModal.data?.total && <p className="text-slate-500 text-sm">No reactions yet</p>}
+          </div>
+        </div>
+      )}
+
+      {/* Share modal — caption optional, user decides */}
+      {shareTarget && (
+        <div
+          className="fixed inset-0 z-[80] bg-black/50 flex items-center justify-center p-3 sm:p-4"
+          onClick={() => !sharing && setShareTarget(null)}
+        >
+          <div className="bg-white rounded-2xl neo-modal p-4 sm:p-5 w-full max-w-lg space-y-3 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-brand">Share post</h3>
+              <button onClick={() => setShareTarget(null)} disabled={sharing} className="text-slate-500 hover:text-slate-800 disabled:opacity-50">✕</button>
+            </div>
+            <textarea
+              value={shareText}
+              onChange={(e) => setShareText(e.target.value)}
+              placeholder="Add an optional caption... (leave empty to share as is)"
+              className="w-full border rounded-lg p-3 resize-none focus:ring-2 focus:ring-brand focus:outline-none"
+              rows={3}
+              disabled={sharing}
+            />
+            <div className="border rounded-lg p-3 bg-slate-50">
+              <p className="text-xs text-slate-500 mb-1">
+                {shareTarget._id === user?._id ? "Your post" : `Post by ${shareTarget.author?.fullname || "Unknown"}`}
+              </p>
+              <p className="text-sm line-clamp-4">{shareTarget.text || "(no text)"}</p>
+              {shareTarget.attachments?.length > 0 && (
+                <img src={shareTarget.attachments[0]} alt="" className="mt-2 rounded-lg w-full object-cover max-h-40" />
+              )}
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setShareTarget(null)}
+                disabled={sharing}
+                className="px-4 py-2 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitShare}
+                disabled={sharing}
+                className="px-5 py-2 rounded-lg bg-brand text-white font-semibold hover:opacity-90 disabled:opacity-50"
+              >
+                {sharing ? "Sharing..." : "Share"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {hasMore && (
         <button onClick={() => loadFeed(cursor)} disabled={loading} className="w-full py-2 rounded-lg bg-slate-100 hover:bg-slate-200">

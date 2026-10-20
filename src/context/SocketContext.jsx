@@ -3,8 +3,10 @@ import { useAuth } from "./AuthContext";
 import { useNavigate } from "react-router-dom";
 import { io } from "socket.io-client";
 import { FiBell } from "react-icons/fi";
-import { getAuthToken } from "../utils/authToken";
+import { getAuthToken, setAuthToken } from "../utils/authToken";
 import { SOCKET_URL } from "../api/config";
+import api from "../api/axios";
+import IncomingCallOverlay from "../components/IncomingCallOverlay";
 
 const SocketContext = createContext({
   socket: null,
@@ -42,7 +44,122 @@ export function SocketProvider({ children }) {
   const [onlineIds, setOnlineIds] = useState(() => new Set());
   const [toast, setToast] = useState(null);
   const [unreadMessages, setUnreadMessages] = useState(0);
+  // True while the chat screen is mounted — lets other UI (e.g. the chat-with-admin
+  // FAB) back off so it never overlaps an active conversation.
+  const [chatOpen, setChatOpen] = useState(false);
+
+  // ---------- Global call signaling ----------
+  // Incoming call state lives here (not in Chat) so it can ring/show on ANY page.
+  const [incomingCall, setIncomingCall] = useState(null); // { from, offer, callType }
+  const [callPendingAccept, setCallPendingAccept] = useState(false);
+  const ringRef = useRef({ timer: null, ctx: null });
+  const pcRef = useRef(null); // active RTCPeerConnection (managed by Chat)
+  const iceBufferRef = useRef([]); // ICE candidates that arrived before the peer existed
+  const incomingCallRef = useRef(null); // live mirror of incomingCall for socket handlers
+  const refreshRetryRef = useRef(false);
   const toastTimer = useRef(null);
+
+  // Ringtone (callee) / ringback (caller) using WebAudio — no asset files needed.
+  const stopRing = () => {
+    const r = ringRef.current;
+    if (r.timer) {
+      clearInterval(r.timer);
+      r.timer = null;
+    }
+    if (r.ctx) {
+      try {
+        r.ctx.close();
+      } catch {
+        /* ignore */
+      }
+      r.ctx = null;
+    }
+  };
+
+  const startRing = (kind = "ringtone") => {
+    stopRing();
+    try {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextClass) return;
+      const ctx = new AudioContextClass();
+      ringRef.current.ctx = ctx;
+      const resume = () => {
+        if (ctx.state === "suspended") ctx.resume().catch(() => {});
+      };
+      document.addEventListener("pointerdown", resume, { once: true });
+      resume();
+      const beep = () => {
+        try {
+          const now = ctx.currentTime;
+          const notes = kind === "ringback" ? [425] : [660, 880];
+          notes.forEach((freq, i) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = "sine";
+            osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.0001, now);
+            gain.gain.exponentialRampToValueAtTime(0.1, now + 0.03);
+            gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.32 + i * 0.35);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now + i * 0.35);
+            osc.stop(now + i * 0.35 + 0.35);
+          });
+        } catch {
+          /* ignore */
+        }
+      };
+      beep();
+      ringRef.current.timer = setInterval(beep, kind === "ringback" ? 3500 : 2500);
+    } catch {
+      // Audio is optional and may be blocked by browser policy.
+    }
+  };
+
+  const attachPeer = (pc) => {
+    pcRef.current = pc;
+  };
+  const detachPeer = () => {
+    pcRef.current = null;
+    iceBufferRef.current = [];
+  };
+  const handleRemoteIce = (candidate) => {
+    if (!candidate) return;
+    const pc = pcRef.current;
+    if (pc && pc.remoteDescription) {
+      pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(() => {});
+    } else {
+      iceBufferRef.current.push(candidate);
+    }
+  };
+  const flushIce = async () => {
+    const pc = pcRef.current;
+    if (!pc) return;
+    const queued = iceBufferRef.current.splice(0);
+    for (const c of queued) {
+      try {
+        await pc.addIceCandidate(new RTCIceCandidate(c));
+      } catch {
+        /* ignore */
+      }
+    }
+  };
+  const clearIncomingCall = () => {
+    setIncomingCall(null);
+    stopRing();
+  };
+  const rejectIncomingCall = () => {
+    const from = incomingCall?.from;
+    if (socketRef.current && from) socketRef.current.emit("call:end", { to: from, reason: "declined" });
+    setIncomingCall(null);
+    setCallPendingAccept(false);
+    stopRing();
+  };
+
+  // Socket handlers read the current incoming call through this ref.
+  useEffect(() => {
+    incomingCallRef.current = incomingCall;
+  }, [incomingCall]);
 
   useEffect(() => {
     // Wait until the API session is confirmed before opening a realtime socket.
@@ -51,20 +168,41 @@ export function SocketProvider({ children }) {
       setSocketConnected(false);
       return;
     }
-    const token = getAuthToken();
-
     const s = io(SOCKET_URL, {
       withCredentials: true,
-      auth: token ? { token } : {},
+      // Access tokens expire (30m TTL). Read a FRESH token on every
+      // (re)connect attempt — a stale snapshot made the socket fail auth
+      // silently after any reconnect, so calls/messages stopped arriving.
+      auth: (cb) => cb({ token: getAuthToken() }),
     });
     socketRef.current = s;
     setSocket(s);
-    s.on("connect", () => setSocketConnected(true));
+    s.on("connect", () => {
+      refreshRetryRef.current = false;
+      setSocketConnected(true);
+    });
     s.on("disconnect", () => {
       setSocketConnected(false);
       setOnlineIds(new Set());
     });
-    s.on("connect_error", () => setSocketConnected(false));
+    s.on("connect_error", (err) => {
+      setSocketConnected(false);
+      // Likely an expired handshake token — refresh the session once and retry.
+      const msg = String(err?.message || "");
+      if (!refreshRetryRef.current && /token|auth/i.test(msg)) {
+        refreshRetryRef.current = true;
+        api
+          .post("/auth/refresh-token")
+          .then((res) => {
+            const newToken = res.data?.accessToken;
+            if (newToken) setAuthToken(newToken);
+            s.connect();
+          })
+          .catch(() => {
+            refreshRetryRef.current = false;
+          });
+      }
+    });
 
     s.on("presence:list", (payload) => {
       const ids = Array.isArray(payload)
@@ -121,8 +259,33 @@ export function SocketProvider({ children }) {
       toastTimer.current = setTimeout(() => setToast(null), 4000);
     });
 
+    // ---------- Call signaling (works on every page) ----------
+    s.on("call:offer", ({ from, offer, callType }) => {
+      if (!from || !offer) return;
+      setCallPendingAccept(false);
+      setIncomingCall({ from, offer, callType: callType === "video" ? "video" : "audio" });
+      startRing("ringtone"); // callee rings until accept/decline/end
+    });
+    s.on("call:ice", ({ candidate }) => handleRemoteIce(candidate));
+    s.on("call:end", () => {
+      // Still ringing here → the other side gave up before we answered.
+      const wasRinging = !!incomingCallRef.current;
+      setIncomingCall(null);
+      setCallPendingAccept(false);
+      stopRing();
+      if (wasRinging) {
+        setToast({ convId: null, text: "Missed call" });
+        if (toastTimer.current) clearTimeout(toastTimer.current);
+        toastTimer.current = setTimeout(() => setToast(null), 4000);
+      }
+    });
+
     return () => {
       if (toastTimer.current) clearTimeout(toastTimer.current);
+      stopRing();
+      detachPeer();
+      setIncomingCall(null);
+      setCallPendingAccept(false);
       s.disconnect();
       socketRef.current = null;
       setSocket(null);
@@ -148,8 +311,33 @@ export function SocketProvider({ children }) {
   const clearUnreadMessages = () => setUnreadMessages(0);
 
   return (
-    <SocketContext.Provider value={{ socket, socketConnected, onlineIds, toast, showToast, dismissToast, goToChat, unreadMessages, clearUnreadMessages }}>
+    <SocketContext.Provider
+      value={{
+        socket,
+        socketConnected,
+        onlineIds,
+        toast,
+        showToast,
+        dismissToast,
+        goToChat,
+        unreadMessages,
+        clearUnreadMessages,
+        chatOpen,
+        setChatOpen,
+        incomingCall,
+        clearIncomingCall,
+        rejectIncomingCall,
+        callPendingAccept,
+        setCallPendingAccept,
+        startRing,
+        stopRing,
+        attachPeer,
+        detachPeer,
+        flushIce,
+      }}
+    >
       {children}
+      <IncomingCallOverlay />
       {toast && (
         <div
           onClick={() => goToChat(toast.convId)}

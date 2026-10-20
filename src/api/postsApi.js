@@ -3,7 +3,7 @@ import api from "./axios";
 export const postsApi = {
   feed: (cursor, limit = 20) =>
     api.get("/posts/feed", { params: { cursor, limit } }),
-  create: (formData) => api.post("/posts", formData, { headers: { "Content-Type": "multipart/form-data" } }),
+  create: (formData) => api.post("/posts", formData),
   get: (id) => api.get(`/posts/${id}`),
   remove: (id) => api.delete(`/posts/${id}`),
   share: (id) => api.post(`/posts/${id}/share`),
@@ -12,6 +12,8 @@ export const postsApi = {
   byHashtag: (tag, limit = 20) => api.get(`/posts/hashtag/${tag}`, { params: { limit } }),
   react: (targetType, targetId, type) =>
     api.post(`/posts/${targetType}/${targetId}/react`, { type }),
+  reactions: (targetType, targetId) =>
+    api.get(`/posts/${targetType}/${targetId}/reactions`),
   addComment: (postId, text, parentId) =>
     api.post(`/posts/${postId}/comments`, { text, parentId }),
   comments: (postId, page = 1, parentId) =>

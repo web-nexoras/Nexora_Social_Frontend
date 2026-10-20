@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import api from "../api/axios";
 import { friendsApi } from "../api/friendsApi";
@@ -10,7 +10,6 @@ import { FiArrowRight, FiCheck, FiX } from "react-icons/fi";
 export default function Dashboard() {
   const { user } = useAuth();
   const { showToast } = useToast();
-  const navigate = useNavigate();
   const isAdmin = user?.role === "admin";
   const [stats, setStats] = useState({
     friends: 0,
@@ -20,9 +19,7 @@ export default function Dashboard() {
     totalUsers: 0,
     pendingApprovals: 0,
   });
-  const [recent, setRecent] = useState([]);
-  const [allUsers, setAllUsers] = useState([]);
-  const [incoming, setIncoming] = useState([]);
+  const [allUsers, setAllUsers] = useState([]);  const [incoming, setIncoming] = useState([]);
   const [suggestions, setSuggestions] = useState([]);
 
   useEffect(() => {
@@ -51,7 +48,6 @@ export default function Dashboard() {
             return status === "pending";
           }).length,
         });
-        setRecent((c.data?.conversations || []).slice(0, 5));
         setIncoming(inc.data?.requests || []);
         setSuggestions(s.data?.users || []);
         if (isAdmin) setAllUsers(u.data?.users || []);
@@ -91,19 +87,6 @@ export default function Dashboard() {
       }));
     } catch (e) {
       showToast(e?.response?.data?.message || "Could not reject friend request", "error");
-    }
-  };
-
-  const messageAdmin = async () => {
-    try {
-      const res = await usersApi.admins();
-      const admins = res.data?.admins || [];
-      if (admins.length > 0) {
-        navigate(`/chat?user=${admins[0]._id}`);
-      }
-    } catch (e) {
-      console.error(e);
-      showToast(e?.response?.data?.message || "Could not find an admin", "error");
     }
   };
 
@@ -397,12 +380,6 @@ export default function Dashboard() {
           >
             Payments
           </Link>
-          <button
-            onClick={messageAdmin}
-            className="px-4 py-2 rounded-lg bg-brand text-white font-semibold hover:bg-slate-700 transition"
-          >
-            Message Admin
-          </button>
           {isAdmin && (
             <>
               <Link
@@ -422,38 +399,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Recent conversations */}
-      <div className="bg-white rounded-2xl shadow p-6">
-        <h2 className="text-xl font-bold text-brand mb-4">
-          Recent Conversations
-        </h2>
-        {recent.length === 0 && (
-          <p className="text-slate-500 text-sm">No conversations yet</p>
-        )}
-        <div className="space-y-3">
-          {recent.map((c) => (
-            <Link
-              key={c._id}
-              to={`/chat?conversation=${c._id}`}
-              className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 transition"
-            >
-              <div>
-                <p className="font-medium text-slate-800">
-                  {c.type === "group"
-                    ? c.groupName
-                    : c.participants?.map((p) => p.fullname).join(", ")}
-                </p>
-                <p className="text-xs text-slate-400 truncate">
-                  {c.lastMessage?.text || "No messages yet"}
-                </p>
-              </div>
-              <span className="inline-flex items-center gap-1 text-xs text-brand font-semibold">
-                Open <FiArrowRight />
-              </span>
-            </Link>
-          ))}
-        </div>
-      </div>
+      {/* Recent conversations removed — messaging lives in the always-visible bottom-right chat icon */}
     </div>
   );
 }

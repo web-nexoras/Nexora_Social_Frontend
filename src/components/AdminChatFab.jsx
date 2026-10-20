@@ -1,14 +1,21 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { usersApi } from "../api/usersApi";
 import { FiMessageSquare } from "react-icons/fi";
 import { useToast } from "../context/ToastContext";
+import { useSocket } from "../context/SocketContext";
 
-// Floating action button — always available so any user can message an admin for free.
+// Floating action button — available everywhere EXCEPT while a chat is open,
+// so it never covers or interrupts an ongoing conversation.
 export default function AdminChatFab() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { showToast } = useToast();
+  const { chatOpen } = useSocket() || {};
   const [busy, setBusy] = useState(false);
+
+  // Hidden on the chat route and whenever the chat screen is mounted/active.
+  if (busy || chatOpen || location.pathname.startsWith("/chat")) return null;
 
   const openAdminChat = async () => {
     setBusy(true);
