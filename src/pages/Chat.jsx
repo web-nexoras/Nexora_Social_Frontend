@@ -31,6 +31,7 @@ export default function Chat() {
   const [activeId, setActiveId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
+  const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(false);
   const [mobileView, setMobileView] = useState("list");
   const [highlighted, setHighlighted] = useState(new Set());
@@ -358,9 +359,12 @@ export default function Chat() {
       setShowSubscribe(true);
       return;
     }
-    if (!text.trim() || !activeId) return;
+    const content = text.trim();
+    if (!content || !activeId || sending) return;
+    setSending(true);
+    setText("");
     try {
-      const res = await chatApi.send(activeId, text);
+      const res = await chatApi.send(activeId, content);
       const msg = res.data?.message;
       if (msg) {
         setMessages((prev) => {
@@ -368,10 +372,12 @@ export default function Chat() {
           return [...prev, msg];
         });
       }
-      setText("");
     } catch (e) {
       console.error(e);
+      setText(content);
       showToast(e?.response?.data?.message || "Message could not be sent", "error");
+    } finally {
+      setSending(false);
     }
   };
 
@@ -734,7 +740,7 @@ export default function Chat() {
                   >
                     <FiMoreVertical />
                   </button>
-                  {menuConvId === c._id && (
+                  {menuConvId === c._id && (c.type !== "group" || isAdmin) && (
                     <div className="absolute right-0 z-30 mt-1 w-40 bg-white rounded-xl neo-menu border py-1 text-sm">
                       <button
                         onClick={(e) => {
@@ -952,9 +958,10 @@ export default function Chat() {
               />
               <button
                 type="submit"
-                className="px-4 py-2 rounded-lg bg-brand text-white font-semibold hover:bg-indigo-700 transition"
+                disabled={sending || !text.trim()}
+                className="px-4 py-2 rounded-lg bg-brand text-white font-semibold hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Send
+                {sending ? "Sending..." : "Send"}
               </button>
             </form>
           )}

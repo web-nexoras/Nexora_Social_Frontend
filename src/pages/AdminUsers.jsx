@@ -151,7 +151,12 @@ export default function AdminUsers() {
                   {status === "approved" && (
                     <button onClick={() => reject(u._id)} className="text-xs px-2 py-1 rounded bg-slate-400 text-white">Reject</button>
                   )}
-                  <button onClick={() => toggle(u._id)} className="text-xs px-2 py-1 rounded bg-slate-500 text-white">
+                  <button
+                    onClick={() => toggle(u._id)}
+                    disabled={u._id === user?._id}
+                    className="text-xs px-2 py-1 rounded bg-slate-500 text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                    title={u._id === user?._id ? "You cannot deactivate your own account" : ""}
+                  >
                     {u.isActive ? "Deactivate" : "Activate"}
                   </button>
                 </td>
