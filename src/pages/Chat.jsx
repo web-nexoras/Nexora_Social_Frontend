@@ -23,6 +23,10 @@ import {
   FiArrowLeft,
   FiSearch,
   FiUserPlus,
+  FiPhone,
+  FiVideo,
+  FiSmile,
+  FiBookmark,
 } from "react-icons/fi";
 
 export default function Chat() {
@@ -86,6 +90,13 @@ export default function Chat() {
   }, [avatarMenuId]);
   const [editingId, setEditingId] = useState(null);
   const [editText, setEditText] = useState("");
+  const [incomingCall, setIncomingCall] = useState(null);
+  const [inCall, setInCall] = useState(false);
+  const [callMinimized, setCallMinimized] = useState(false);
+  const pcRef = useRef(null);
+  const localStreamRef = useRef(null);
+  const remoteAudioRef = useRef(null);
+  const remoteVideoRef = useRef(null);
 
   const loadConversations = async () => {
     try {
@@ -94,6 +105,70 @@ export default function Chat() {
     } catch (e) {
       showToast(e?.response?.data?.message || "Could not load conversations", "error");
     }
+  };
+
+  const startCall = async (callType) => {
+    if (!socket || !otherParticipant?._id || activeConv?.type !== "direct") {
+      showToast("Calls only available in direct chats", "info");
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: callType === "video" });
+      localStreamRef.current = stream;
+      const pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
+      pcRef.current = pc;
+      stream.getTracks().forEach((t) => pc.addTrack(t, stream));
+      pc.onicecandidate = (e) => {
+        if (e.candidate) socket.emit("call:ice", { to: otherParticipant._id, candidate: e.candidate });
+      };
+      pc.ontrack = (e) => {
+        if (remoteVideoRef.current) remoteVideoRef.current.srcObject = e.streams[0];
+        if (remoteAudioRef.current) remoteAudioRef.current.srcObject = e.streams[0];
+      };
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      socket.emit("call:offer", { to: otherParticipant._id, offer, callType });
+      setInCall(true);
+    } catch (e) {
+      showToast("Could not start call", "error");
+    }
+  };
+
+  const acceptCall = async () => {
+    if (!incomingCall) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: incomingCall.callType === "video" });
+      localStreamRef.current = stream;
+      const pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
+      pcRef.current = pc;
+      stream.getTracks().forEach((t) => pc.addTrack(t, stream));
+      pc.onicecandidate = (e) => {
+        if (e.candidate) socket.emit("call:ice", { to: incomingCall.from, candidate: e.candidate });
+      };
+      pc.ontrack = (e) => {
+        if (remoteVideoRef.current) remoteVideoRef.current.srcObject = e.streams[0];
+        if (remoteAudioRef.current) remoteAudioRef.current.srcObject = e.streams[0];
+      };
+      await pc.setRemoteDescription(new RTCSessionDescription(incomingCall.offer));
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      socket.emit("call:answer", { to: incomingCall.from, answer });
+      setInCall(true);
+      setIncomingCall(null);
+    } catch (e) {
+      showToast("Could not accept call", "error");
+    }
+  };
+
+  const endCall = () => {
+    if (pcRef.current) pcRef.current.close();
+    pcRef.current = null;
+    if (localStreamRef.current) localStreamRef.current.getTracks().forEach((t) => t.stop());
+    localStreamRef.current = null;
+    setInCall(false);
+    setCallMinimized(false);
+    setIncomingCall(null);
+    if (socket && otherParticipant?._id) socket.emit("call:end", { to: otherParticipant._id });
   };
 
   const handleSearch = async (q) => {
@@ -367,11 +442,31 @@ export default function Chat() {
     socket.on("conversation:deleted", onConversationDeleted);
     socket.on("message:updated", onMessageUpdated);
 
+    const onCallOffer = async ({ from, offer, callType }) => {
+      setIncomingCall({ from, offer, callType });
+    };
+    const onCallAnswer = async ({ answer }) => {
+      if (pcRef.current) await pcRef.current.setRemoteDescription(new RTCSessionDescription(answer));
+    };
+    const onCallIce = async ({ candidate }) => {
+      if (pcRef.current && candidate) await pcRef.current.addIceCandidate(new RTCIceCandidate(candidate));
+    };
+    const onCallEnd = () => endCall();
+
+    socket.on("call:offer", onCallOffer);
+    socket.on("call:answer", onCallAnswer);
+    socket.on("call:ice", onCallIce);
+    socket.on("call:end", onCallEnd);
+
     return () => {
       socket.off("message:new", onMessageNew);
       socket.off("message:deleted", onMessageDeleted);
       socket.off("conversation:deleted", onConversationDeleted);
       socket.off("message:updated", onMessageUpdated);
+      socket.off("call:offer", onCallOffer);
+      socket.off("call:answer", onCallAnswer);
+      socket.off("call:ice", onCallIce);
+      socket.off("call:end", onCallEnd);
     };
   }, [socket]);
 
@@ -434,7 +529,7 @@ export default function Chat() {
     setSending(true);
     setText("");
     try {
-      const res = await chatApi.send(activeId, content);
+      const res = await chatApi.send(activeId, { text: content });
       const msg = res.data?.message;
       if (msg) {
         setMessages((prev) => {
@@ -743,7 +838,7 @@ export default function Chat() {
       <div className="flex flex-col gap-6">
         {/* Conversation list */}
         <div
-          className={`bg-white rounded-2xl shadow p-4 h-[calc(100vh-6rem)] overflow-y-auto ${activeId ? "hidden" : "block"}`}
+          className={`bg-white rounded-2xl shadow p-4 h-[calc(100dvh-6rem)] overflow-y-auto ${activeId ? "hidden" : "block"}`}
         >
           {/* Search */}
           <div className="relative mb-3">
@@ -893,7 +988,7 @@ export default function Chat() {
 
         {/* Chat window */}
         <div
-          className={`bg-white rounded-2xl shadow flex flex-col h-[calc(100vh-6rem)] min-h-[20rem] ${activeId ? "flex" : "hidden"}`}
+          className={`bg-white rounded-2xl shadow flex flex-col h-[calc(100dvh-6rem)] min-h-[20rem] ${activeId ? "flex" : "hidden"}`}
         >
           <div className="pl-2 pr-6 py-4 border-b flex items-center gap-3">
             <button
@@ -928,6 +1023,16 @@ export default function Chat() {
                     : otherParticipant?.fullname
                   : ""}
             </button>
+            {activeConv?.type === "direct" && otherParticipant && (
+              <div className="ml-auto flex items-center gap-2">
+                <button onClick={() => startCall("audio")} className="p-2 rounded-full hover:bg-indigo-50 text-slate-600 hover:text-brand" title="Voice call">
+                  <FiPhone />
+                </button>
+                <button onClick={() => startCall("video")} className="p-2 rounded-full hover:bg-indigo-50 text-slate-600 hover:text-brand" title="Video call">
+                  <FiVideo />
+                </button>
+              </div>
+            )}
             {lockedGroup && (
               <span className="ml-2 inline-flex items-center gap-1 text-xs font-semibold text-slate-500">
                 <FiLock /> Not joined
@@ -964,6 +1069,36 @@ export default function Chat() {
               </button>
             )}
           </div>
+          {incomingCall && (
+            <div className="fixed inset-0 z-[80] bg-black/60 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl p-6 w-full max-w-sm text-center space-y-4">
+                <p className="text-lg font-bold text-brand">Incoming {incomingCall.callType} call</p>
+                <div className="flex gap-3 justify-center">
+                  <button onClick={acceptCall} className="px-5 py-2 rounded-lg bg-green-500 text-white font-semibold">Accept</button>
+                  <button onClick={endCall} className="px-5 py-2 rounded-lg bg-red-500 text-white font-semibold">Reject</button>
+                </div>
+              </div>
+            </div>
+          )}
+          {inCall && !callMinimized && (
+            <div className="fixed inset-0 z-[80] bg-slate-900 flex flex-col items-center justify-center p-6 text-white">
+              <p className="text-2xl font-bold mb-2">In call</p>
+              <p className="text-slate-300 mb-6">{otherParticipant?.fullname}</p>
+              <video ref={remoteVideoRef} autoPlay playsInline className="w-full max-w-md rounded-xl bg-black mb-6" />
+              <div className="flex gap-3">
+                <button onClick={() => setCallMinimized(true)} className="px-5 py-2 rounded-lg bg-slate-700 text-white font-semibold">Chat</button>
+                <button onClick={endCall} className="px-5 py-2 rounded-lg bg-red-500 text-white font-semibold">End call</button>
+              </div>
+            </div>
+          )}
+          {inCall && callMinimized && (
+            <div className="fixed top-20 right-4 z-[80] bg-slate-900 text-white rounded-xl shadow-lg px-4 py-3 flex items-center gap-3">
+              <span className="text-sm font-semibold">In call</span>
+              <button onClick={() => setCallMinimized(false)} className="px-3 py-1.5 rounded-lg bg-slate-700 text-white text-sm">Open</button>
+              <button onClick={endCall} className="px-3 py-1.5 rounded-lg bg-red-500 text-white text-sm">End</button>
+            </div>
+          )}
+          <audio ref={remoteAudioRef} autoPlay playsInline className="hidden" />
           <div ref={messagesContainerRef} className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 space-y-4">
             {loading && (
               <div className="space-y-3">
@@ -1120,7 +1255,7 @@ export default function Chat() {
               </button>
             </div>
           ) : (
-            <form onSubmit={sendMessage} className="p-4 border-t flex gap-2">
+            <form onSubmit={sendMessage} className="p-4 border-t flex gap-2 shrink-0 bg-white">
               <input
                 value={text}
                 onChange={(e) => setText(e.target.value)}
