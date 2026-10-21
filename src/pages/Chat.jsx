@@ -8,6 +8,7 @@ import { groupsApi, paymentsApi } from "../api/groupsApi";
 import { usersApi } from "../api/usersApi";
 import { friendsApi } from "../api/friendsApi";
 import { followsApi } from "../api/followsApi";
+import { ICE_SERVERS } from "../api/config";
 import PaymentMethodModal from "../components/PaymentMethodModal";
 import InlineLoader from "../components/InlineLoader";
 import Skeleton from "../components/Skeleton";
@@ -35,6 +36,17 @@ import {
   FiMinimize2,
 } from "react-icons/fi";
 
+// FB-style message reactions (long-press the bubble to open the picker)
+const MSG_REACTIONS = [
+  { key: "like", emoji: "👍", label: "Like" },
+  { key: "love", emoji: "❤️", label: "Love" },
+  { key: "haha", emoji: "😂", label: "Haha" },
+  { key: "wow", emoji: "😮", label: "Wow" },
+  { key: "sad", emoji: "😢", label: "Sad" },
+  { key: "angry", emoji: "😠", label: "Angry" },
+];
+const MSG_EMOJI = Object.fromEntries(MSG_REACTIONS.map((r) => [r.key, r.emoji]));
+
 export default function Chat() {
   const [searchParams] = useSearchParams();
   const targetUserId = searchParams.get("user");
@@ -56,7 +68,7 @@ export default function Chat() {
   const [mobileView, setMobileView] = useState("list");
   // highlighted state removed to avoid temporary color/border on new messages
   const [unreadIds, setUnreadIds] = useState(new Set());
-  const { socket, socketConnected, onlineIds, clearUnreadMessages, setChatOpen, incomingCall, clearIncomingCall, callPendingAccept, setCallPendingAccept, startRing, stopRing, attachPeer, detachPeer, flushIce } = useSocket();
+  const { socket, socketConnected, onlineIds, lastSeenById, clearUnreadMessages, setChatOpen, incomingCall, clearIncomingCall, callPendingAccept, setCallPendingAccept, startRing, stopRing, attachPeer, detachPeer, flushIce } = useSocket();
 
   // Mark chat as active while this screen is open — hides the chat-with-admin FAB
   // so it never pops up over an ongoing conversation.
@@ -102,6 +114,10 @@ export default function Chat() {
     return () => document.removeEventListener("mousedown", handler);
   }, [avatarMenuId]);
   const [editingId, setEditingId] = useState(null);
+  const [msgMenuId, setMsgMenuId] = useState(null); // message 3-dot menu
+  const [reactPickerFor, setReactPickerFor] = useState(null); // long-press reaction picker
+  const pressTimerRef = useRef(null); // long-press timer
+  const pickerOpenedAtRef = useRef(0); // ignores the click that follows a long-press
   const [editText, setEditText] = useState("");
   // Call UI: inCall = media session exists, callPhase = "calling" (ringing out)
   // or "connected" (answered).
@@ -120,12 +136,6 @@ export default function Chat() {
   const remoteStreamRef = useRef(null);
   const answeredRef = useRef(false);
   const ringTimeoutRef = useRef(null);
-  // Call-log tracking (the caller records the call in the conversation)
-  const isCallInitiatorRef = useRef(false);
-  const callLoggedRef = useRef(false);
-  const callStartedAtRef = useRef(null);
-  const callSecondsRef = useRef(0);
-  const endReasonRef = useRef(null);
   const activeConvRef = useRef(null);
   const otherParticipantRef = useRef(null);
 
@@ -144,10 +154,6 @@ export default function Chat() {
     const t = setInterval(() => setCallSeconds((s) => s + 1), 1000);
     return () => clearInterval(t);
   }, [callPhase]);
-
-  useEffect(() => {
-    callSecondsRef.current = callSeconds;
-  }, [callSeconds]);
 
   const loadConversations = async () => {
     try {
@@ -168,7 +174,7 @@ export default function Chat() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: kind === "video" });
       localStreamRef.current = stream;
-      const pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
+      const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
       pcRef.current = pc;
       attachPeer(pc);
       stream.getTracks().forEach((t) => pc.addTrack(t, stream));
@@ -178,16 +184,21 @@ export default function Chat() {
       pc.ontrack = (e) => {
         remoteStreamRef.current = e.streams[0];
         if (remoteVideoRef.current) remoteVideoRef.current.srcObject = e.streams[0];
-        if (remoteAudioRef.current) remoteAudioRef.current.srcObject = e.streams[0];
+        if (remoteAudioRef.current) {
+          remoteAudioRef.current.srcObject = e.streams[0];
+          // Autoplay can be blocked before a user gesture — retry explicitly.
+          remoteAudioRef.current.play?.().catch(() => {});
+        }
       };
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
-      socket.emit("call:offer", { to: otherParticipant._id, offer, callType: kind });
+      socket.emit("call:offer", {
+        to: otherParticipant._id,
+        offer,
+        callType: kind,
+        conversationId: activeConv?._id || null, // server writes the ONE call log
+      });
       answeredRef.current = false;
-      isCallInitiatorRef.current = true;
-      callLoggedRef.current = false;
-      endReasonRef.current = null;
-      callStartedAtRef.current = Date.now();
       setInCall(true);
       setCallPhase("calling"); // ringing — not connected yet
       setCallType(kind);
@@ -216,7 +227,7 @@ export default function Chat() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: incomingCall.callType === "video" });
       localStreamRef.current = stream;
-      const pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
+      const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
       pcRef.current = pc;
       attachPeer(pc);
       stream.getTracks().forEach((t) => pc.addTrack(t, stream));
@@ -226,7 +237,11 @@ export default function Chat() {
       pc.ontrack = (e) => {
         remoteStreamRef.current = e.streams[0];
         if (remoteVideoRef.current) remoteVideoRef.current.srcObject = e.streams[0];
-        if (remoteAudioRef.current) remoteAudioRef.current.srcObject = e.streams[0];
+        if (remoteAudioRef.current) {
+          remoteAudioRef.current.srcObject = e.streams[0];
+          // Autoplay can be blocked before a user gesture — retry explicitly.
+          remoteAudioRef.current.play?.().catch(() => {});
+        }
       };
       await pc.setRemoteDescription(new RTCSessionDescription(incomingCall.offer));
       const answer = await pc.createAnswer();
@@ -234,9 +249,6 @@ export default function Chat() {
       socket.emit("call:answer", { to: incomingCall.from, answer });
       await flushIce(); // candidates that arrived while it was still ringing
       answeredRef.current = true;
-      isCallInitiatorRef.current = false; // we are the callee — caller logs the call
-      callLoggedRef.current = true;
-      callStartedAtRef.current = Date.now();
       setInCall(true);
       setCallPhase("connected");
       setCallType(incomingCall.callType === "video" ? "video" : "audio");
@@ -255,24 +267,8 @@ export default function Chat() {
   };
 
   const endCall = (notify = true) => {
-    const finalPhase = callPhaseRef.current;
-    // Caller records the finished call in the conversation (call log bubble).
-    if (isCallInitiatorRef.current && !callLoggedRef.current && socket && activeConvRef.current?._id) {
-      callLoggedRef.current = true;
-      const status =
-        finalPhase === "connected"
-          ? "completed"
-          : endReasonRef.current === "declined"
-            ? "declined"
-            : "missed";
-      socket.emit("call:log", {
-        conversationId: activeConvRef.current._id,
-        callType,
-        status,
-        durationSec: finalPhase === "connected" ? callSecondsRef.current : 0,
-        startedAt: callStartedAtRef.current || Date.now(),
-      });
-    }
+    // The ONE call log is written server-side when call:end lands — the
+    // frontend never emits a log anymore (kills duplicate log bubbles).
     if (ringTimeoutRef.current) clearTimeout(ringTimeoutRef.current);
     stopRing();
     if (pcRef.current) pcRef.current.close();
@@ -599,10 +595,20 @@ export default function Chat() {
       );
     };
 
+    // A reaction was toggled on a message — sync live
+    const onMessageReacted = (payload) => {
+      const messageId = payload?.messageId || payload?.message?._id;
+      if (!messageId || !Array.isArray(payload?.reactions)) return;
+      setMessages((prev) =>
+        prev.map((m) => (m._id === messageId ? { ...m, reactions: payload.reactions } : m)),
+      );
+    };
+
     socket.on("message:new", onMessageNew);
     socket.on("message:deleted", onMessageDeleted);
     socket.on("conversation:deleted", onConversationDeleted);
     socket.on("message:updated", onMessageUpdated);
+    socket.on("message:reacted", onMessageReacted);
 
     // call:offer + call:ice are handled globally by SocketContext (so the
     // incoming call screen shows on any page and early ICE is buffered).
@@ -620,7 +626,6 @@ export default function Chat() {
       }
     };
     const onCallEnd = ({ reason } = {}) => {
-      endReasonRef.current = reason || null;
       // Tell the caller why it stopped while the call was still ringing out.
       if (callPhaseRef.current === "calling") {
         showToast(reason === "declined" ? "Call declined" : "No answer — call ended", "info");
@@ -636,6 +641,7 @@ export default function Chat() {
       socket.off("message:deleted", onMessageDeleted);
       socket.off("conversation:deleted", onConversationDeleted);
       socket.off("message:updated", onMessageUpdated);
+      socket.off("message:reacted", onMessageReacted);
       socket.off("call:answer", onCallAnswer);
       socket.off("call:end", onCallEnd);
     };
@@ -688,6 +694,51 @@ export default function Chat() {
       showToast(e?.response?.data?.message || "Could not update message", "error");
     }
   };
+
+  // ---- Message reactions (FB-style long-press) ----
+  const startPress = (m) => {
+    clearTimeout(pressTimerRef.current);
+    pressTimerRef.current = setTimeout(() => {
+      pickerOpenedAtRef.current = Date.now();
+      setReactPickerFor(m._id);
+    }, 450);
+  };
+  const cancelPress = () => clearTimeout(pressTimerRef.current);
+
+  const reactToMessage = async (m, type) => {
+    setReactPickerFor(null);
+    const prev = Array.isArray(m.reactions) ? m.reactions : [];
+    const mineIdx = prev.findIndex((r) => (r.user?._id || r.user) === user?._id);
+    // optimistic: same emoji again = remove, different = switch
+    let next;
+    if (mineIdx > -1 && prev[mineIdx].type === type) next = prev.filter((_, i) => i !== mineIdx);
+    else if (mineIdx > -1) next = prev.map((r, i) => (i === mineIdx ? { ...r, type } : r));
+    else next = [...prev, { user: { _id: user?._id }, type }];
+    setMessages((prevMsgs) => prevMsgs.map((x) => (x._id === m._id ? { ...x, reactions: next } : x)));
+    try {
+      const res = await chatApi.reactMessage(m._id, type);
+      const reactions = res.data?.reactions || [];
+      setMessages((prevMsgs) => prevMsgs.map((x) => (x._id === m._id ? { ...x, reactions } : x)));
+    } catch (e) {
+      setMessages((prevMsgs) => prevMsgs.map((x) => (x._id === m._id ? { ...x, reactions: prev } : x)));
+      showToast(e?.response?.data?.message || "Could not react", "error");
+    }
+  };
+
+  // Close message menus / reaction picker on outside click
+  useEffect(() => {
+    if (!msgMenuId && !reactPickerFor) return;
+    const close = (e) => {
+      // a long-press fires a trailing click on the bubble — don't let it
+      // instantly close the picker we just opened
+      if (Date.now() - pickerOpenedAtRef.current < 400) return;
+      if (e.target.closest?.("[data-msg-menu]") || e.target.closest?.("[data-react-picker]")) return;
+      setMsgMenuId(null);
+      setReactPickerFor(null);
+    };
+    document.addEventListener("click", close);
+    return () => document.removeEventListener("click", close);
+  }, [msgMenuId, reactPickerFor]);
 
   const sendMessage = async (e) => {
     e.preventDefault();
@@ -866,8 +917,26 @@ export default function Chat() {
     return acc;
   }, []);
 
+  // "Seen" only under the LAST message I sent that someone else has read
+  const lastOwnMessageId = [...messages]
+    .reverse()
+    .find((m) => (m.sender?._id || m.sender) === user?._id)?._id;
+
+  // Human day label for the date separator between message groups
+  const dayLabel = (dateInput) => {
+    const d = new Date(dateInput);
+    const today = new Date();
+    const yesterday = new Date();
+    yesterday.setDate(today.getDate() - 1);
+    if (d.toDateString() === today.toDateString()) return "Today";
+    if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
+    return d.toLocaleDateString([], { day: "numeric", month: "short", year: "numeric" });
+  };
+  const fmtMsgTime = (dateInput) =>
+    new Date(dateInput).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
   return (
-    <div className="max-w-6xl mx-auto mt-6">
+    <div className="max-w-6xl mx-auto h-[calc(100dvh-6rem)] sm:h-[calc(100dvh-7rem)] overflow-hidden">
       {lockedGroup && showSubscribe && (
         <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl neo-modal max-w-md w-full p-6">
@@ -1014,7 +1083,7 @@ export default function Chat() {
         />
       )}
 
-      <div className="flex flex-col h-[calc(100dvh-4rem)] gap-3 overflow-hidden">
+      <div className="flex flex-col h-full gap-3 overflow-hidden">
         {/* Conversation list */}
         <div
           className={`bg-white rounded-2xl shadow p-4 flex-1 min-h-0 overflow-y-auto overflow-x-hidden ${activeId ? "hidden" : "block"}`}
@@ -1169,7 +1238,7 @@ export default function Chat() {
         <div
           className={`bg-white rounded-2xl shadow flex flex-col flex-1 min-h-0 overflow-hidden ${activeId ? "flex" : "hidden"}`}
         >
-          <div className="pl-2 pr-6 py-4 border-b flex items-center gap-3">
+          <div className="pl-2 pr-3 sm:pr-6 py-3 sm:py-4 border-b flex items-center gap-2 sm:gap-3">
             <button
               onClick={() => { setActiveId(null); setMessages([]); setMobileView("list"); }}
               className="shrink-0 p-2 rounded-lg hover:bg-indigo-50 text-slate-600 hover:text-brand transition border-0"
@@ -1183,7 +1252,7 @@ export default function Chat() {
                   otherParticipant.avatar || "https://via.placeholder.com/40"
                 }
                 alt=""
-                className="w-9 h-9 rounded-full object-cover"
+                className="shrink-0 w-9 h-9 rounded-full object-cover"
               />
             )}
             <button
@@ -1192,19 +1261,27 @@ export default function Chat() {
                   navigate(`/user/${otherParticipant._id}`);
                 }
               }}
-              className="text-xl font-bold text-brand flex items-center gap-2"
+              className="min-w-0 flex-1 text-left text-base sm:text-xl font-bold text-brand flex items-center gap-2"
             >
-              {lockedGroup
-                ? lockedGroup.name
-                : activeConv
-                  ? activeConv.type === "group"
-                    ? activeConv.groupName
-                    : otherParticipant?.fullname
-                  : ""}
+              <span className="truncate">
+                {lockedGroup
+                  ? lockedGroup.name
+                  : activeConv
+                    ? activeConv.type === "group"
+                      ? activeConv.groupName
+                      : otherParticipant?.fullname
+                    : ""}
+              </span>
               {activeConv && activeConv.type !== "group" && otherParticipant && (
                 <span
-                  title={isOtherOnline ? "Active now" : "Offline"}
-                  className={`inline-flex items-center gap-1.5 text-xs font-semibold ${
+                  title={
+                    isOtherOnline
+                      ? "Active now"
+                      : lastSeenById[otherParticipant._id]
+                        ? `Last seen ${new Date(lastSeenById[otherParticipant._id]).toLocaleString()}`
+                        : "Offline"
+                  }
+                  className={`shrink-0 inline-flex items-center gap-1.5 text-[11px] sm:text-xs font-semibold ${
                     isOtherOnline ? "text-green-600" : "text-slate-400"
                   }`}
                 >
@@ -1215,7 +1292,13 @@ export default function Chat() {
                         : "bg-slate-400"
                     }`}
                   />
-                  {isOtherOnline ? "Active" : "Offline"}
+                  <span className="hidden sm:inline">
+                    {isOtherOnline
+                      ? "Active"
+                      : lastSeenById[otherParticipant._id]
+                        ? "Last seen"
+                        : "Offline"}
+                  </span>
                 </span>
               )}
             </button>
@@ -1225,14 +1308,14 @@ export default function Chat() {
               </span>
             )}
             {activeConv?.type === "direct" && otherParticipant && (
-              <div className="ml-auto flex items-center gap-2">
-                <button onClick={() => startCall("audio")} className="p-2 rounded-full hover:bg-indigo-50 text-slate-600 hover:text-brand" title="Voice call">
+              <div className="shrink-0 flex items-center gap-1 sm:gap-2">
+                <button onClick={() => startCall("audio")} className="shrink-0 p-2 rounded-full hover:bg-indigo-50 text-slate-600 hover:text-brand" title="Voice call">
                   <FiPhone />
                 </button>
-                <button onClick={() => startCall("video")} className="p-2 rounded-full hover:bg-indigo-50 text-slate-600 hover:text-brand" title="Video call">
+                <button onClick={() => startCall("video")} className="shrink-0 p-2 rounded-full hover:bg-indigo-50 text-slate-600 hover:text-brand" title="Video call">
                   <FiVideo />
                 </button>
-                <button onClick={() => showToast("Info panel coming soon", "info")} className="p-2 rounded-full hover:bg-indigo-50 text-slate-600 hover:text-brand" title="Info">
+                <button onClick={() => showToast("Info panel coming soon", "info")} className="p-2 rounded-full hover:bg-indigo-50 text-slate-600 hover:text-brand max-sm:hidden" title="Info">
                   <FiInfo />
                 </button>
               </div>
@@ -1432,40 +1515,71 @@ export default function Chat() {
             {grouped.map((group, gi) => {
               const senderId = group.sender?._id || group.sender;
               const isMe = senderId === user?._id;
+              // Day separator: show when this group starts a new calendar day
+              const firstMsgTime = new Date(group.messages[0]?.createdAt || Date.now());
+              const prevGroupLast = gi > 0 ? grouped[gi - 1].messages[grouped[gi - 1].messages.length - 1] : null;
+              const showDaySep =
+                !prevGroupLast ||
+                firstMsgTime.toDateString() !== new Date(prevGroupLast.createdAt).toDateString();
               return (
+                <React.Fragment key={gi}>
+                {showDaySep && (
+                  <div className="flex items-center gap-3 py-1" role="separator">
+                    <div className="h-px flex-1 bg-slate-200" />
+                    <span className="text-[11px] font-semibold text-slate-400 select-none">
+                      {dayLabel(firstMsgTime)}
+                    </span>
+                    <div className="h-px flex-1 bg-slate-200" />
+                  </div>
+                )}
                 <div
-                  key={gi}
                   className={`flex ${isMe ? "justify-end" : "justify-start"}`}
                 >
-                  <div className="max-w-[75%]">
+                  <div className="max-w-[85%] sm:max-w-[75%]">
                     <div className="space-y-1">
                       {group.messages.map((m) =>
                         m.callMeta?.status ? (
-                          /* Call-history bubble (centered pill) */
-                          <div key={m._id} className="flex justify-center py-1">
-                            <div className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs shadow-sm text-slate-500">
-                              {m.callMeta.status === "missed" ? (
-                                <FiPhoneOff className="text-red-500 shrink-0" />
-                              ) : m.callMeta.callType === "video" ? (
-                                <FiVideo className="text-emerald-500 shrink-0" />
-                              ) : (
-                                <FiPhone className="text-emerald-500 shrink-0" />
-                              )}
-                              <span className="font-medium text-slate-600">
-                                {m.callMeta.status === "missed"
-                                  ? `Missed ${m.callMeta.callType === "video" ? "video" : "voice"} call`
-                                  : m.callMeta.status === "declined"
-                                    ? `${m.callMeta.callType === "video" ? "Video" : "Voice"} call declined`
-                                    : `${m.callMeta.callType === "video" ? "Video" : "Voice"} call`}
-                              </span>
-                              {m.callMeta.status === "completed" && m.callMeta.durationSec > 0 && (
-                                <span>· {fmtTime(m.callMeta.durationSec)}</span>
-                              )}
-                              <span className="text-slate-400">
-                                · {new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                              </span>
-                            </div>
-                          </div>
+                          /* Call-history bubble (centered pill) — labels follow
+                             the viewer's perspective: the caller sees
+                             "Declined"/"No answer", the receiver sees "Missed". */
+                          (() => {
+                            const meta = m.callMeta;
+                            const isVideo = meta.callType === "video";
+                            const kindLabel = isVideo ? "Video" : "Voice";
+                            const isCaller = String(m.sender?._id || m.sender) === String(user?._id);
+                            let Icon, iconCls, label;
+                            if (meta.status === "completed") {
+                              Icon = isVideo ? FiVideo : FiPhone;
+                              iconCls = "text-emerald-500";
+                              label = `${kindLabel} call`;
+                            } else if (meta.status === "declined") {
+                              Icon = FiPhoneOff;
+                              iconCls = "text-red-500";
+                              label = isCaller
+                                ? `${kindLabel} call declined`
+                                : `Missed ${kindLabel.toLowerCase()} call`;
+                            } else {
+                              Icon = isVideo ? FiVideoOff : FiPhoneOff;
+                              iconCls = "text-slate-400";
+                              label = isCaller
+                                ? `No answer — ${kindLabel.toLowerCase()} call`
+                                : `Missed ${kindLabel.toLowerCase()} call`;
+                            }
+                            return (
+                              <div key={m._id} className="flex justify-center py-1">
+                                <div className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs shadow-sm text-slate-500">
+                                  <Icon className={`${iconCls} shrink-0`} />
+                                  <span className="font-medium text-slate-600">{label}</span>
+                                  {meta.status === "completed" && meta.durationSec > 0 && (
+                                    <span>· {fmtTime(meta.durationSec)}</span>
+                                  )}
+                                  <span className="text-slate-400">
+                                    · {new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })()
                         ) : editingId === m._id ? (
                           <div key={m._id} className="flex items-center gap-1">
                             <input
@@ -1501,7 +1615,7 @@ export default function Chat() {
                         ) : (
                           <div
                             key={m._id}
-                            className="group/msg flex items-end gap-2"
+                            className="group/msg relative flex items-end gap-2"
                           >
                             {!isMe && (
                               <div className="relative shrink-0">
@@ -1535,51 +1649,142 @@ export default function Chat() {
                                 )}
                               </div>
                             )}
-                            <div className="flex flex-col">
+                            <div className="flex flex-col min-w-0">
                               {!isMe && activeConv?.type === "group" && (
                                 <span className="text-[10px] font-semibold text-slate-500 mb-0.5 ml-1">
                                   {group.sender?.fullname}
                                 </span>
                               )}
-                            <div
-                              className={`px-4 py-2 rounded-2xl transition ${
-                                isMe
-                                  ? "bg-brand text-white rounded-br-sm"
-                                  : "bg-slate-100 text-slate-800 rounded-bl-sm"
-                              }`}
-                            >
-                              {m.text}
-                              {m.editedAt && (
-                                <span className="ml-1.5 text-[10px] opacity-70 align-middle">
-                                  (edited)
-                                </span>
-                              )}
-                            </div>
-                            {isMe && (
-                              <div className="text-[10px] text-slate-300 text-right mt-0.5">
-                                {Array.isArray(m.readBy) && m.readBy.some((r) => String(r) !== String(user?._id)) ? "Seen" : "Sent"}
+                              <div className="relative">
+                                {/* Long-press (or right-click) this bubble to react */}
+                                <div
+                                  onPointerDown={() => startPress(m)}
+                                  onPointerUp={cancelPress}
+                                  onPointerLeave={cancelPress}
+                                  onPointerCancel={cancelPress}
+                                  onContextMenu={(e) => {
+                                    e.preventDefault();
+                                    pickerOpenedAtRef.current = Date.now();
+                                    setReactPickerFor(m._id);
+                                  }}
+                                  className={`px-4 py-2 rounded-2xl transition select-none break-words ${
+                                    isMe
+                                      ? "bg-brand text-white rounded-br-sm"
+                                      : "bg-slate-100 text-slate-800 rounded-bl-sm"
+                                  }`}
+                                >
+                                  {m.text}
+                                  {m.editedAt && (
+                                    <span className="ml-1.5 text-[10px] opacity-70 align-middle">
+                                      (edited)
+                                    </span>
+                                  )}
+                                </div>
+
+                                {/* FB-style floating reaction picker */}
+                                {reactPickerFor === m._id && (
+                                  <div
+                                    data-react-picker
+                                    className={`absolute bottom-full z-40 mb-1 flex items-end gap-0.5 rounded-full bg-white border border-slate-100 shadow-[0_8px_30px_rgba(0,0,0,0.15)] px-2 py-1.5 ${
+                                      isMe ? "right-0" : "left-0"
+                                    }`}
+                                  >
+                                    {MSG_REACTIONS.map((r, i) => (
+                                      <button
+                                        key={r.key}
+                                        onPointerDown={(e) => e.stopPropagation()}
+                                        onClick={() => reactToMessage(m, r.key)}
+                                        title={r.label}
+                                        className="group/emoji relative p-0.5 emoji-pop"
+                                        style={{ animationDelay: `${i * 45}ms` }}
+                                      >
+                                        <span className="block text-2xl leading-none transition-transform duration-150 group-hover/emoji:scale-[1.7] group-hover/emoji:-translate-y-1.5">
+                                          {r.emoji}
+                                        </span>
+                                        <span className="pointer-events-none absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md bg-slate-800 text-white text-[10px] px-1.5 py-0.5 opacity-0 group-hover/emoji:opacity-100 transition">
+                                          {r.label}
+                                        </span>
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+
+                                {/* Reactions under the bubble — click to toggle yours */}
+                                {(() => {
+                                  const reactions = Array.isArray(m.reactions) ? m.reactions : [];
+                                  if (!reactions.length) return null;
+                                  const counts = {};
+                                  reactions.forEach((r) => {
+                                    const t = r.type || "like";
+                                    counts[t] = (counts[t] || 0) + 1;
+                                  });
+                                  return (
+                                    <div className="flex flex-wrap gap-1 mt-0.5 px-1">
+                                      {Object.entries(counts).map(([type, count]) => (
+                                        <button
+                                          key={type}
+                                          onClick={() => reactToMessage(m, type)}
+                                          title={`${count} reacted (${type})`}
+                                          className="flex items-center gap-0.5 bg-white border border-slate-200 rounded-full px-1.5 py-0.5 text-xs shadow-sm hover:scale-110 transition"
+                                        >
+                                          <span>{MSG_EMOJI[type] || "👍"}</span>
+                                          <span className="text-slate-600 font-semibold">{count}</span>
+                                        </button>
+                                      ))}
+                                    </div>
+                                  );
+                                })()}
                               </div>
-                            )}
+                              {/* Time under every bubble; "Seen" only on my LAST message */}
+                              <div className={`text-[10px] text-slate-400 mt-0.5 ${isMe ? "text-right" : "text-left ml-8"}`}>
+                                {fmtMsgTime(m.createdAt)}
+                                {isMe && m._id === lastOwnMessageId && (
+                                  <span className={Array.isArray(m.readBy) && m.readBy.some((r) => String(r) !== String(user?._id)) ? "text-emerald-500 font-medium" : ""}>
+                                    {" · "}
+                                    {Array.isArray(m.readBy) && m.readBy.some((r) => String(r) !== String(user?._id)) ? "Seen" : "Sent"}
+                                  </span>
+                                )}
+                              </div>
                             </div>
-                            {isMe && (
-                              <button
-                                onClick={() => startEdit(m)}
-                                title="Edit message"
-                                aria-label="Edit message"
-                                className="shrink-0 p-1 opacity-0 group-hover/msg:opacity-100 focus:opacity-100 text-slate-900 hover:text-slate-600 transition"
-                              >
-                                <FiEdit2 size={14} />
-                              </button>
-                            )}
+                            {/* 3-dot menu — absolutely placed so it adds ZERO gap to the bubble */}
                             {(isMe || isAdmin) && (
-                              <button
-                                onClick={() => removeMessage(m._id)}
-                                title="Delete message"
-                                aria-label="Delete message"
-                                className="shrink-0 p-1 opacity-0 group-hover/msg:opacity-100 focus:opacity-100 text-slate-900 hover:text-slate-600 transition"
+                              <div
+                                data-msg-menu
+                                className={`absolute top-0 ${isMe ? "right-full mr-1" : "left-full ml-1"} z-30`}
                               >
-                                <FiTrash2 size={14} />
-                              </button>
+                                <button
+                                  onClick={() => setMsgMenuId(msgMenuId === m._id ? null : m._id)}
+                                  title="Message options"
+                                  aria-label="Message options"
+                                  className="p-1 rounded-full bg-white/90 border border-slate-200 text-slate-500 hover:text-slate-800 shadow-sm opacity-0 group-hover/msg:opacity-100 focus:opacity-100 max-sm:opacity-70 transition"
+                                >
+                                  <FiMoreVertical size={13} />
+                                </button>
+                                {msgMenuId === m._id && (
+                                  <div className={`absolute top-full mt-1 w-28 bg-white rounded-xl neo-menu border py-1 text-sm shadow ${isMe ? "right-0" : "left-0"}`}>
+                                    {isMe && (
+                                      <button
+                                        onClick={() => {
+                                          setMsgMenuId(null);
+                                          startEdit(m);
+                                        }}
+                                        className="w-full flex items-center gap-2 text-left px-3 py-1.5 hover:bg-slate-50"
+                                      >
+                                        <FiEdit2 size={13} /> Edit
+                                      </button>
+                                    )}
+                                    <button
+                                      onClick={() => {
+                                        setMsgMenuId(null);
+                                        removeMessage(m._id);
+                                      }}
+                                      className="w-full flex items-center gap-2 text-left px-3 py-1.5 text-red-600 hover:bg-red-50"
+                                    >
+                                      <FiTrash2 size={13} /> Delete
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
                             )}
                           </div>
                         ),
@@ -1587,6 +1792,7 @@ export default function Chat() {
                     </div>
                   </div>
                 </div>
+                </React.Fragment>
               );
             })}
           </div>

@@ -28,3 +28,21 @@ export const API_BASE_URL = resolveApiBaseUrl();
 export const SOCKET_URL = USE_DEV_API_PROXY
   ? window.location.origin
   : API_BASE_URL.replace(/\/api\/v1\/?$/i, "");
+
+// WebRTC ICE servers for calls. Add a TURN server via env for cross-network
+// calls (same-WiFi works on STUN alone; mobile data / different networks NEED
+// TURN). Set VITE_TURN_URL (+ VITE_TURN_USERNAME / VITE_TURN_PASSWORD) in .env.
+export const ICE_SERVERS = (() => {
+  const servers = [
+    { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
+  ];
+  const turnUrl = import.meta.env.VITE_TURN_URL;
+  if (turnUrl) {
+    servers.push({
+      urls: turnUrl.split(",").map((u) => u.trim()).filter(Boolean),
+      username: import.meta.env.VITE_TURN_USERNAME || "",
+      credential: import.meta.env.VITE_TURN_PASSWORD || "",
+    });
+  }
+  return servers;
+})();

@@ -12,6 +12,7 @@ const SocketContext = createContext({
   socket: null,
   socketConnected: false,
   onlineIds: new Set(),
+  lastSeenById: {},
   toast: null,
   showToast: () => {},
   dismissToast: () => {},
@@ -42,6 +43,8 @@ export function SocketProvider({ children }) {
   const [socket, setSocket] = useState(null);
   const [socketConnected, setSocketConnected] = useState(false);
   const [onlineIds, setOnlineIds] = useState(() => new Set());
+  // userId -> last-seen ISO timestamp (from user:offline presence events)
+  const [lastSeenById, setLastSeenById] = useState({});
   const [toast, setToast] = useState(null);
   const [unreadMessages, setUnreadMessages] = useState(0);
   // True while the chat screen is mounted — lets other UI (e.g. the chat-with-admin
@@ -87,6 +90,7 @@ export function SocketProvider({ children }) {
         if (ctx.state === "suspended") ctx.resume().catch(() => {});
       };
       document.addEventListener("pointerdown", resume, { once: true });
+      document.addEventListener("touchstart", resume, { once: true, passive: true });
       resume();
       const beep = () => {
         try {
@@ -168,6 +172,21 @@ export function SocketProvider({ children }) {
       setSocketConnected(false);
       return;
     }
+    // Ask for notification permission once on the first user gesture so calls
+    // can ring via a system notification while the tab is in the background.
+    const askNotifPermission = () => {
+      try {
+        if ("Notification" in window && Notification.permission === "default") {
+          Notification.requestPermission().catch(() => {});
+        }
+      } catch {
+        /* ignore */
+      }
+      document.removeEventListener("pointerdown", askNotifPermission);
+      document.removeEventListener("touchstart", askNotifPermission);
+    };
+    document.addEventListener("pointerdown", askNotifPermission);
+    document.addEventListener("touchstart", askNotifPermission);
     const s = io(SOCKET_URL, {
       withCredentials: true,
       // Access tokens expire (30m TTL). Read a FRESH token on every
@@ -220,6 +239,9 @@ export function SocketProvider({ children }) {
     s.on("user:offline", (payload) => {
       const userId = getSocketUserId(payload);
       if (!userId) return;
+      if (payload?.lastSeen) {
+        setLastSeenById((prev) => ({ ...prev, [userId]: payload.lastSeen }));
+      }
       setOnlineIds((prev) => {
         const next = new Set(prev);
         next.delete(userId);
@@ -263,11 +285,31 @@ export function SocketProvider({ children }) {
     });
 
     // ---------- Call signaling (works on every page) ----------
+    // System notification so a call rings even when the tab is in the background
+    // (browser Notification API — no FCM/service-worker setup needed).
+    const showCallNotification = (callType) => {
+      try {
+        if (!("Notification" in window)) return;
+        if (Notification.permission !== "granted") return;
+        if (!document.hidden) return; // visible tab already shows the overlay + ringtone
+        const n = new Notification(
+          callType === "video" ? "Incoming video call" : "Incoming voice call",
+          { body: "Open Nexora to answer", tag: "nexora-call", requireInteraction: true },
+        );
+        n.onclick = () => {
+          window.focus();
+          n.close();
+        };
+      } catch {
+        /* notifications are optional */
+      }
+    };
     s.on("call:offer", ({ from, offer, callType }) => {
       if (!from || !offer) return;
       setCallPendingAccept(false);
       setIncomingCall({ from, offer, callType: callType === "video" ? "video" : "audio" });
       startRing("ringtone"); // callee rings until accept/decline/end
+      showCallNotification(callType);
     });
     s.on("call:ice", ({ candidate }) => handleRemoteIce(candidate));
     s.on("call:end", () => {
@@ -284,6 +326,8 @@ export function SocketProvider({ children }) {
     });
 
     return () => {
+      document.removeEventListener("pointerdown", askNotifPermission);
+      document.removeEventListener("touchstart", askNotifPermission);
       if (toastTimer.current) clearTimeout(toastTimer.current);
       stopRing();
       detachPeer();
@@ -319,6 +363,7 @@ export function SocketProvider({ children }) {
         socket,
         socketConnected,
         onlineIds,
+        lastSeenById,
         toast,
         showToast,
         dismissToast,
