@@ -9,7 +9,10 @@ export default function DashboardShell() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="flex min-h-screen neo-surface">
+    /* h-screen + overflow-hidden = ONLY the <main> scrolls. Sidebar and
+       Topbar keep their own fixed height so page scrolling can never
+       drag them out of view (was: min-h-screen let the whole page scroll). */
+    <div className="flex h-screen overflow-hidden neo-surface">
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
@@ -30,7 +33,7 @@ export default function DashboardShell() {
       {/* Content area */}
       <div className="flex-1 flex flex-col min-w-0">
         <Topbar onMenuClick={() => setSidebarOpen(true)} />
-        <main className="flex-1 p-4 sm:p-6 overflow-y-auto">
+        <main className="flex-1 min-h-0 p-4 sm:p-6 overflow-y-auto">
           <Outlet />
         </main>
       </div>

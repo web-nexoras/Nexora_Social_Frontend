@@ -49,6 +49,25 @@ const MSG_REACTIONS = [
 ];
 const MSG_EMOJI = Object.fromEntries(MSG_REACTIONS.map((r) => [r.key, r.emoji]));
 
+// Force every mic track through the strongest noise-cleaning pipeline the
+// browser offers: noise suppression, echo cancellation, auto gain + voice
+// isolation (Chrome/Edge). applyConstraints re-applies after the device
+// gives us the track — some mics drop the flags from the initial request.
+const primeAudioTrack = (track) => {
+  try {
+    track
+      .applyConstraints({
+        noiseSuppression: true,
+        echoCancellation: true,
+        autoGainControl: true,
+        voiceIsolation: true,
+      })
+      .catch(() => {});
+  } catch {
+    /* older browsers — default processing stays on */
+  }
+};
+
 export default function Chat() {
   const [searchParams] = useSearchParams();
   const targetUserId = searchParams.get("user");
@@ -185,12 +204,19 @@ export default function Chat() {
     if (inCall) return;
     const kind = type === "video" ? "video" : "audio";
     try {
-      // Noise suppression + echo cancellation + auto gain — keeps background
-      // noise out of the call (crystal-clear voice, Messenger-style).
+      // Noise suppression + echo cancellation + auto gain + voice isolation —
+      // keeps background noise out of the call (crystal-clear voice, Messenger-style).
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { noiseSuppression: true, echoCancellation: true, autoGainControl: true },
+        audio: {
+          noiseSuppression: true,
+          echoCancellation: true,
+          autoGainControl: true,
+          voiceIsolation: true,
+          advanced: [{ noiseSuppression: true, echoCancellation: true, autoGainControl: true }],
+        },
         video: kind === "video",
       });
+      stream.getAudioTracks().forEach(primeAudioTrack); // re-assert noise cleaning on the real track
       localStreamRef.current = stream;
       const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
       pcRef.current = pc;
@@ -248,9 +274,16 @@ export default function Chat() {
     try {
       // Same clean-audio constraints on the accepting side.
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { noiseSuppression: true, echoCancellation: true, autoGainControl: true },
+        audio: {
+          noiseSuppression: true,
+          echoCancellation: true,
+          autoGainControl: true,
+          voiceIsolation: true,
+          advanced: [{ noiseSuppression: true, echoCancellation: true, autoGainControl: true }],
+        },
         video: incomingCall.callType === "video",
       });
+      stream.getAudioTracks().forEach(primeAudioTrack); // re-assert noise cleaning on the real track
       localStreamRef.current = stream;
       const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
       pcRef.current = pc;

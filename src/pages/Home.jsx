@@ -19,6 +19,6 @@ export default function Home() {
     );
   }
 
-  // Guests go straight to the Sign In page
-  return <Navigate to={user ? "/dashboard" : "/signin"} replace />;
+  // Guests go straight to the Sign In page; logged-in users land on the FEED
+  return <Navigate to={user ? "/feed" : "/signin"} replace />;
 }

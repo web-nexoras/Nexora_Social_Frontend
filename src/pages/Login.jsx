@@ -46,7 +46,7 @@ export default function Login() {
     try {
       await login(email.trim(), password);
       showToast("Signed in successfully! Welcome back.", "success");
-      navigate("/dashboard");
+      navigate("/feed");
     } catch (err) {
       const msg = err?.response?.data?.message ||
         (err?.code === "ERR_NETWORK" || !err?.response

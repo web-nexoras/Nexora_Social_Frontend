@@ -59,7 +59,7 @@ export default function AuthCallback() {
           setTimeout(() => navigate("/signin"), 3000);
         } else {
           showToast("Signed in successfully! Welcome back.", "success");
-          navigate("/dashboard");
+          navigate("/feed");
         }
       } catch (err) {
         if (cancelled) return;

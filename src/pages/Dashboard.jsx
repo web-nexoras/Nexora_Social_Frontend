@@ -5,7 +5,7 @@ import api from "../api/axios";
 import { friendsApi } from "../api/friendsApi";
 import { usersApi } from "../api/usersApi";
 import { useToast } from "../context/ToastContext";
-import { FiArrowRight, FiCheck, FiX } from "react-icons/fi";
+import { FiArrowRight, FiCheck, FiX, FiUserPlus } from "react-icons/fi";
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -21,6 +21,36 @@ export default function Dashboard() {
   });
   const [allUsers, setAllUsers] = useState([]);  const [incoming, setIncoming] = useState([]);
   const [suggestions, setSuggestions] = useState([]);
+
+  // Admin: quick "add user" modal (creates an approved account instantly)
+  const [showAddUser, setShowAddUser] = useState(false);
+  const [newUser, setNewUser] = useState({ fullname: "", email: "", password: "", role: "user" });
+  const [creating, setCreating] = useState(false);
+
+  const handleAddUser = async (e) => {
+    e.preventDefault();
+    if (creating) return;
+    if (!newUser.fullname.trim() || !newUser.email.trim() || newUser.password.length < 8) {
+      showToast("Name, email & password (min 8 chars) required", "error");
+      return;
+    }
+    setCreating(true);
+    try {
+      const res = await usersApi.create(newUser);
+      const u = res.data?.user;
+      if (u) {
+        setAllUsers((prev) => [u, ...prev]);
+        setStats((s) => ({ ...s, totalUsers: s.totalUsers + 1 }));
+      }
+      showToast("User added successfully", "success");
+      setNewUser({ fullname: "", email: "", password: "", role: "user" });
+      setShowAddUser(false);
+    } catch (err) {
+      showToast(err?.response?.data?.message || "Failed to add user", "error");
+    } finally {
+      setCreating(false);
+    }
+  };
 
   useEffect(() => {
     let alive = true;
@@ -283,14 +313,22 @@ export default function Dashboard() {
       {/* All users (admin only) */}
       {isAdmin && (
         <div className="bg-white rounded-2xl shadow p-6">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
             <h2 className="text-xl font-bold text-brand">All Users</h2>
-            <Link
-              to="/admin/users"
-              className="inline-flex items-center gap-1 text-sm text-brand font-medium hover:underline"
-            >
-              Manage <FiArrowRight />
-            </Link>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setShowAddUser(true)}
+                className="inline-flex items-center gap-1.5 text-sm font-semibold text-white bg-brand px-3 py-1.5 rounded-lg hover:bg-slate-700 transition"
+              >
+                <FiUserPlus /> Add User
+              </button>
+              <Link
+                to="/admin/users"
+                className="inline-flex items-center gap-1 text-sm text-brand font-medium hover:underline"
+              >
+                Manage <FiArrowRight />
+              </Link>
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -400,6 +438,72 @@ export default function Dashboard() {
       </div>
 
       {/* Recent conversations removed — messaging lives in the always-visible bottom-right chat icon */}
+
+      {/* Admin: add-user modal — create accounts anytime, no OTP needed */}
+      {isAdmin && showAddUser && (
+        <div
+          className="fixed inset-0 z-[90] bg-black/40 flex items-center justify-center p-4"
+          onClick={() => !creating && setShowAddUser(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-brand">Add New User</h3>
+              <button
+                onClick={() => !creating && setShowAddUser(false)}
+                aria-label="Close"
+                className="p-1.5 rounded-full hover:bg-slate-100 text-slate-500"
+              >
+                <FiX />
+              </button>
+            </div>
+            <form onSubmit={handleAddUser} className="space-y-3">
+              <input
+                type="text"
+                placeholder="Full name"
+                value={newUser.fullname}
+                onChange={(e) => setNewUser((n) => ({ ...n, fullname: e.target.value }))}
+                className="w-full neo-input rounded-lg px-3 py-2.5 text-sm"
+                autoFocus
+              />
+              <input
+                type="email"
+                placeholder="Email"
+                value={newUser.email}
+                onChange={(e) => setNewUser((n) => ({ ...n, email: e.target.value }))}
+                className="w-full neo-input rounded-lg px-3 py-2.5 text-sm"
+              />
+              <input
+                type="password"
+                placeholder="Password (min 8 characters)"
+                value={newUser.password}
+                onChange={(e) => setNewUser((n) => ({ ...n, password: e.target.value }))}
+                className="w-full neo-input rounded-lg px-3 py-2.5 text-sm"
+              />
+              <select
+                value={newUser.role}
+                onChange={(e) => setNewUser((n) => ({ ...n, role: e.target.value }))}
+                className="w-full neo-input rounded-lg px-3 py-2.5 text-sm"
+              >
+                <option value="user">User</option>
+                <option value="admin">Admin</option>
+              </select>
+              <p className="text-xs text-slate-400">
+                The account is verified &amp; approved instantly — user can log in right away.
+              </p>
+              <button
+                type="submit"
+                disabled={creating}
+                className="w-full py-2.5 rounded-lg bg-brand text-white font-semibold hover:bg-slate-700 transition disabled:opacity-60"
+              >
+                {creating ? "Creating…" : "Create User"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

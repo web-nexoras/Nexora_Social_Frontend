@@ -32,7 +32,7 @@ export default function Sidebar({ onNavigate }) {
   const { unreadMessages } = useSocket();
 
   return (
-    <aside className="neo-raised app-sidebar p-4 flex-1 min-h-screen overflow-y-auto flex flex-col" onClick={onNavigate}>
+    <aside className="neo-raised app-sidebar p-4 flex-1 min-h-0 overflow-y-auto flex flex-col" onClick={onNavigate}>
       <div className="mb-6">
         <h2 className="text-lg font-extrabold text-black">{user?.role === "admin" ? "Nexora Social Admin" : "Nexora Social"}</h2>
         <p className="text-xs text-slate-400 mt-1">
@@ -85,22 +85,23 @@ export default function Sidebar({ onNavigate }) {
         )}
       </nav>
 
-      {/* Theme selector */}
-      <div className="mt-auto pt-4 border-t">
+      {/* Theme selector — pinned to the sidebar bottom and STICKY, so it
+          stays visible on lg screens and inside the mobile drawer too */}
+      <div className="mt-auto sticky bottom-0 bg-inherit pt-4 pb-1 border-t shadow-[0_-6px_16px_rgba(15,23,42,0.06)]">
         <p className="text-xs text-slate-400 mb-2">Appearance</p>
         <div className="flex gap-2">
           <button
             onClick={() => setTheme("light")}
-            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition ${
-              theme === "light" ? "bg-brand text-white shadow" : "text-slate-700 hover:bg-indigo-50 hover:text-brand"
+            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold transition ${
+              theme === "light" ? "bg-brand text-white shadow" : "text-slate-700 bg-white/60 dark:bg-white/10 hover:bg-indigo-50 hover:text-brand"
             }`}
           >
             <FiSun /> Light
           </button>
           <button
             onClick={() => setTheme("dark")}
-            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition ${
-              theme === "dark" ? "bg-brand text-white shadow" : "text-slate-700 hover:bg-indigo-50 hover:text-brand"
+            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold transition ${
+              theme === "dark" ? "bg-brand text-white shadow" : "text-slate-700 bg-white/60 dark:bg-white/10 hover:bg-indigo-50 hover:text-brand"
             }`}
           >
             <FiMoon /> Dark
