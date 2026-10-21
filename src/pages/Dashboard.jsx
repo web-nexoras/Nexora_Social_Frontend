@@ -1,15 +1,16 @@
 import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import api from "../api/axios";
 import { friendsApi } from "../api/friendsApi";
 import { usersApi } from "../api/usersApi";
 import { useToast } from "../context/ToastContext";
-import { FiArrowRight, FiCheck, FiX, FiUserPlus } from "react-icons/fi";
+import { FiArrowRight, FiCheck, FiX, FiUserPlus, FiEdit2 } from "react-icons/fi";
 
 export default function Dashboard() {
   const { user } = useAuth();
   const { showToast } = useToast();
+  const navigate = useNavigate();
   const isAdmin = user?.role === "admin";
   const [stats, setStats] = useState({
     friends: 0,
@@ -26,6 +27,43 @@ export default function Dashboard() {
   const [showAddUser, setShowAddUser] = useState(false);
   const [newUser, setNewUser] = useState({ fullname: "", email: "", password: "", role: "user" });
   const [creating, setCreating] = useState(false);
+
+  // Admin: edit any user's details from the card's edit button
+  const [editingUser, setEditingUser] = useState(null);
+  const [editForm, setEditForm] = useState({ fullname: "", email: "", role: "user", isApproved: true, isActive: true });
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const openEditUser = (u) => {
+    setEditingUser(u);
+    setEditForm({
+      fullname: u.fullname || "",
+      email: u.email || "",
+      role: u.role === "admin" ? "admin" : "user",
+      isApproved: Boolean(u.isApproved),
+      isActive: Boolean(u.isActive),
+    });
+  };
+
+  const handleEditUser = async (e) => {
+    e.preventDefault();
+    if (savingEdit || !editingUser) return;
+    if (!editForm.fullname.trim() || !editForm.email.trim()) {
+      showToast("Name & email are required", "error");
+      return;
+    }
+    setSavingEdit(true);
+    try {
+      const res = await usersApi.update(editingUser._id, editForm);
+      const u = res.data?.user;
+      if (u) setAllUsers((prev) => prev.map((x) => (x._id === u._id ? { ...x, ...u } : x)));
+      showToast("User updated successfully", "success");
+      setEditingUser(null);
+    } catch (err) {
+      showToast(err?.response?.data?.message || "Failed to update user", "error");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
 
   const handleAddUser = async (e) => {
     e.preventDefault();
@@ -62,7 +100,7 @@ export default function Dashboard() {
           api.get("/groups"),
           api.get("/friends/requests/incoming"),
           isAdmin
-            ? usersApi.list()
+            ? usersApi.list({ limit: 100 })
             : Promise.resolve({ data: { users: [], total: 0 } }),
           friendsApi.suggestions(),
         ]);
@@ -330,55 +368,78 @@ export default function Dashboard() {
               </Link>
             </div>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50">
-                <tr>
-                  <th className="text-left px-4 py-3">Name</th>
-                  <th className="text-left px-4 py-3">Email</th>
-                  <th className="text-left px-4 py-3">Role</th>
-                  <th className="text-left px-4 py-3">Approved</th>
-                  <th className="text-left px-4 py-3">Active</th>
-                </tr>
-              </thead>
-              <tbody>
-                {allUsers.map((u) => (
-                  <tr key={u._id} className="border-t">
-                    <td className="px-4 py-3">{u.fullname}</td>
-                    <td className="px-4 py-3">{u.email}</td>
-                    <td className="px-4 py-3">{u.role}</td>
-                    <td className="px-4 py-3">
-                      {u.isApproved ? (
-                        <FiCheck
-                          className="text-green-600 inline"
-                          aria-label="Approved"
-                        />
-                      ) : (
-                        <FiX
-                          className="text-red-500 inline"
-                          aria-label="Not approved"
-                        />
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      {u.isActive ? (
-                        <FiCheck
-                          className="text-green-600 inline"
-                          aria-label="Active"
-                        />
-                      ) : (
-                        <FiX
-                          className="text-red-500 inline"
-                          aria-label="Inactive"
-                        />
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {allUsers.map((u) => (
+              <div
+                key={u._id}
+                role="button"
+                tabIndex={0}
+                onClick={() => navigate(`/user/${u._id}`)}
+                onKeyDown={(e) => e.key === "Enter" && navigate(`/user/${u._id}`)}
+                className="group relative bg-slate-50 rounded-xl p-4 pr-11 hover:shadow-md transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand/40"
+              >
+                {/* Edit icon — click stops propagation, opens the edit modal */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openEditUser(u);
+                  }}
+                  onKeyDown={(e) => e.stopPropagation()}
+                  aria-label={`Edit ${u.fullname}`}
+                  title="Edit user"
+                  className="absolute top-3 right-3 p-2 rounded-lg text-slate-400 hover:text-brand transition"
+                >
+                  <FiEdit2 size={15} />
+                </button>
+
+                <div className="flex items-center gap-3 mb-3">
+                  <img
+                    src={u.avatar || "https://via.placeholder.com/48"}
+                    alt={u.fullname}
+                    className="w-12 h-12 rounded-full object-cover"
+                  />
+                  <div className="min-w-0">
+                    <p className="font-semibold text-slate-800 truncate group-hover:text-brand transition">
+                      {u.fullname}
+                    </p>
+                    <p className="text-xs text-slate-400 truncate">{u.email}</p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${
+                      u.role === "admin"
+                        ? "bg-indigo-100 text-indigo-700"
+                        : "bg-slate-200 text-slate-600"
+                    }`}
+                  >
+                    {u.role}
+                  </span>
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${
+                      u.isApproved
+                        ? "bg-brand text-white"
+                        : "bg-amber-500 text-white"
+                    }`}
+                  >
+                    {u.isApproved ? "Approved" : "Pending"}
+                  </span>
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${
+                      u.isActive
+                        ? "bg-emerald-700 text-white"
+                        : "bg-rose-500 text-white"
+                    }`}
+                  >
+                    {u.isActive ? "Active" : "Inactive"}
+                  </span>
+                </div>
+              </div>
+            ))}
             {allUsers.length === 0 && (
-              <p className="text-center text-slate-500 py-6">No users found</p>
+              <p className="text-center text-slate-500 py-6 sm:col-span-2 lg:col-span-3">
+                No users found
+              </p>
             )}
           </div>
         </div>
@@ -419,20 +480,12 @@ export default function Dashboard() {
             Payments
           </Link>
           {isAdmin && (
-            <>
-              <Link
-                to="/admin/users"
-                className="px-4 py-2 rounded-lg bg-brand text-white font-semibold hover:bg-slate-700 transition"
-              >
-                Admin Users
-              </Link>
-              <Link
-                to="/admin/groups"
-                className="px-4 py-2 rounded-lg bg-brand text-white font-semibold hover:bg-slate-700 transition"
-              >
-                Admin Groups
-              </Link>
-            </>
+            <Link
+              to="/admin/groups"
+              className="px-4 py-2 rounded-lg bg-brand text-white font-semibold hover:bg-slate-700 transition"
+            >
+              Admin Groups
+            </Link>
           )}
         </div>
       </div>
@@ -446,7 +499,7 @@ export default function Dashboard() {
           onClick={() => !creating && setShowAddUser(false)}
         >
           <div
-            className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4"
+            className="bg-white rounded-2xl neo-modal w-full max-w-md p-6 space-y-4"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between">
@@ -499,6 +552,99 @@ export default function Dashboard() {
                 className="w-full py-2.5 rounded-lg bg-brand text-white font-semibold hover:bg-slate-700 transition disabled:opacity-60"
               >
                 {creating ? "Creating…" : "Create User"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Admin: edit-user modal — change any user's details anytime */}
+      {isAdmin && editingUser && (
+        <div
+          className="fixed inset-0 z-[90] bg-black/40 flex items-center justify-center p-4"
+          onClick={() => !savingEdit && setEditingUser(null)}
+        >
+          <div
+            className="bg-white rounded-2xl neo-modal w-full max-w-md p-6 space-y-4 max-h-[90dvh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-brand">Edit User</h3>
+              <button
+                onClick={() => !savingEdit && setEditingUser(null)}
+                aria-label="Close"
+                className="p-1.5 rounded-full hover:bg-slate-100 text-slate-500"
+              >
+                <FiX />
+              </button>
+            </div>
+            <div className="flex items-center gap-3 pb-1">
+              <img
+                src={editingUser.avatar || "https://via.placeholder.com/48"}
+                alt={editingUser.fullname}
+                className="w-12 h-12 rounded-full object-cover"
+              />
+              <p className="text-sm text-slate-500">
+                Editing <span className="font-semibold text-slate-700">{editingUser.fullname}</span>
+              </p>
+            </div>
+            <form onSubmit={handleEditUser} className="space-y-3">
+              <input
+                type="text"
+                placeholder="Full name"
+                value={editForm.fullname}
+                onChange={(e) => setEditForm((f) => ({ ...f, fullname: e.target.value }))}
+                className="w-full neo-input rounded-lg px-3 py-2.5 text-sm"
+                autoFocus
+              />
+              <input
+                type="email"
+                placeholder="Email"
+                value={editForm.email}
+                onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))}
+                className="w-full neo-input rounded-lg px-3 py-2.5 text-sm"
+              />
+              <select
+                value={editForm.role}
+                onChange={(e) => setEditForm((f) => ({ ...f, role: e.target.value }))}
+                disabled={editingUser._id === user?._id}
+                className="w-full neo-input rounded-lg px-3 py-2.5 text-sm disabled:opacity-60"
+              >
+                <option value="user">User</option>
+                <option value="admin">Admin</option>
+              </select>
+              <div className="flex flex-wrap gap-4 pt-1">
+                <label className="inline-flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={editForm.isApproved}
+                    onChange={(e) => setEditForm((f) => ({ ...f, isApproved: e.target.checked }))}
+                    className="w-4 h-4 accent-brand"
+                  />
+                  Approved
+                </label>
+                <label className="inline-flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={editForm.isActive}
+                    onChange={(e) => setEditForm((f) => ({ ...f, isActive: e.target.checked }))}
+                    disabled={editingUser._id === user?._id}
+                    className="w-4 h-4 accent-brand disabled:opacity-60"
+                  />
+                  Active
+                </label>
+              </div>
+              {editingUser._id === user?._id && (
+                <p className="text-xs text-slate-400">
+                  You cannot change your own role or deactivate your account.
+                </p>
+              )}
+              <button
+                type="submit"
+                disabled={savingEdit}
+                className="w-full py-2.5 rounded-lg bg-brand text-white font-semibold hover:bg-slate-700 transition disabled:opacity-60"
+              >
+                {savingEdit ? "Saving…" : "Save Changes"}
               </button>
             </form>
           </div>

@@ -326,9 +326,6 @@ export default function Feed() {
 
   return (
     <div className="max-w-2xl mx-auto py-6 px-4 space-y-6">
-      {/* FB-style story tray — upload & delete your 24h stories right from the feed */}
-      <StoryTray />
-
       {/* Create post — slim single-row style */}
       <div className="bg-white rounded-2xl shadow px-4 pt-4 pb-2.5">
         <form onSubmit={handleCreate} className="space-y-2">
@@ -357,6 +354,9 @@ export default function Feed() {
           </div>
         </form>
       </div>
+
+      {/* FB-style story tray — square cards, right under the composer */}
+      <StoryTray />
 
       {/* Feed */}
       {posts.map((post) => {

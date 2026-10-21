@@ -10,7 +10,6 @@ import {
   FiMessageSquare,
   FiBell,
   FiRss,
-  FiCamera,
   FiTag,
   FiCreditCard,
   FiShield,
@@ -40,20 +39,11 @@ export default function Sidebar({ onNavigate }) {
         </p>
       </div>
       <nav className="space-y-2 lg:space">
-        <NavLink to="/dashboard" className={linkClass}>
-          <FiHome className="shrink-0" /> Dashboard
-        </NavLink>
-        <NavLink to="/profile" className={linkClass}>
-          <FiUser className="shrink-0" /> Profile
-        </NavLink>
-        <NavLink to="/friends" className={linkClass}>
-          <FiUsers className="shrink-0" /> Friends
-        </NavLink>
         <NavLink to="/feed" className={linkClass}>
           <FiRss className="shrink-0" /> Feed
         </NavLink>
-        <NavLink to="/stories" className={linkClass}>
-          <FiCamera className="shrink-0" /> Stories
+        <NavLink to="/profile" className={linkClass}>
+          <FiUser className="shrink-0" /> Profile
         </NavLink>
         <NavLink to="/chat" className={linkClass}>
           <FiMessageSquare className="shrink-0" /> Messages
@@ -62,6 +52,9 @@ export default function Sidebar({ onNavigate }) {
               {unreadMessages > 99 ? "99+" : unreadMessages}
             </span>
           )}
+        </NavLink>
+        <NavLink to="/friends" className={linkClass}>
+          <FiUsers className="shrink-0" /> Friends
         </NavLink>
         <NavLink to="/notifications" className={linkClass}>
           <FiBell className="shrink-0" /> Notifications
@@ -78,6 +71,9 @@ export default function Sidebar({ onNavigate }) {
             <NavLink to="/admin/users" className={linkClass}>
               <FiShield className="shrink-0" /> All Users
             </NavLink>
+        <NavLink to="/dashboard" className={linkClass}>
+          <FiHome className="shrink-0" /> Dashboard
+        </NavLink>
             <NavLink to="/admin/groups" className={linkClass}>
               <FiSettings className="shrink-0" /> Admin Groups
             </NavLink>
