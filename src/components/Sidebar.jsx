@@ -41,7 +41,7 @@ export default function Sidebar({ onNavigate }) {
       </div>
       <nav className="space-y-2 lg:space">
         <NavLink to="/dashboard" className={linkClass}>
-          <FiHome className="shrink-0" /> Overview
+          <FiHome className="shrink-0" /> Dashboard
         </NavLink>
         <NavLink to="/profile" className={linkClass}>
           <FiUser className="shrink-0" /> Profile

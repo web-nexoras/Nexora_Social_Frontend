@@ -1360,7 +1360,7 @@ export default function Chat() {
                 <button onClick={() => startCall("video")} className="shrink-0 p-2 rounded-full bg-indigo-50 hover:bg-indigo-100 text-brand transition" title="Video call">
                   <LuVideo className="w-4 h-4" />
                 </button>
-                <button onClick={() => showToast("Info panel coming soon", "info")} className="p-2 rounded-full hover:bg-indigo-50 text-slate-600 hover:text-brand max-sm:hidden" title="Info">
+                <button onClick={() => showToast("Info panel coming soon", "info")} className="p-2 rounded-full hover:bg-indigo-50 text-slate-600 hover:text-brand" title="Info">
                   <FiInfo />
                 </button>
               </div>
@@ -1400,11 +1400,11 @@ export default function Chat() {
                     className="relative w-28 h-28 sm:w-36 sm:h-36 rounded-full object-cover border-4 border-white/80 shadow-[0_0_60px_rgba(99,102,241,0.45)]"
                   />
                 </div>
-                <p className="text-[11px] uppercase tracking-[0.35em] text-indigo-200/80 mb-3 text-center">
+                <p className="text-[10px] uppercase tracking-[0.35em] text-indigo-200/80 mb-3 text-center">
                   Outgoing {callType === "video" ? "video" : "voice"} call
                 </p>
-                <h2 className="text-3xl font-extrabold mb-3 text-center drop-shadow-lg">{otherParticipant?.fullname || "…"}</h2>
-                <p className="flex items-center gap-2.5 text-sm text-white/60 mb-14">
+                <h2 className="text-2xl font-extrabold mb-3 text-center drop-shadow-lg">{otherParticipant?.fullname || "…"}</h2>
+                <p className="flex items-center gap-2.5 text-xs text-white/60 mb-14">
                   Calling {otherParticipant?.fullname?.split(" ")[0] || ""}
                   <span className="flex gap-1 pb-0.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-white/70 animate-bounce" />
@@ -1418,7 +1418,7 @@ export default function Chat() {
                   </span>
                   <span className="text-xs text-white/70 group-hover:text-white transition">Cancel</span>
                 </button>
-                <p className="absolute bottom-8 text-[11px] text-white/35">Waiting for them to answer…</p>
+                <p className="absolute bottom-8 text-[10px] text-white/35">Waiting for them to answer…</p>
               </div>
             </div>
           )}
@@ -1436,13 +1436,13 @@ export default function Chat() {
                   className="w-11 h-11 rounded-full object-cover border-2 border-white/20"
                 />
                 <div className="min-w-0">
-                  <p className="font-semibold text-sm truncate drop-shadow">{otherParticipant?.fullname || "…"}</p>
-                  <p className="text-xs text-white/60 flex items-center gap-1.5">
+                  <p className="font-semibold text-[13px] truncate drop-shadow">{otherParticipant?.fullname || "…"}</p>
+                  <p className="text-[11px] text-white/60 flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                     {fmtTime(callSeconds)}
                   </p>
                 </div>
-                <span className="ml-auto text-[11px] px-3 py-1.5 rounded-full bg-white/10 backdrop-blur border border-white/15 text-white/80 font-medium">
+                <span className="ml-auto text-[10px] px-2.5 py-1 rounded-full bg-white/10 backdrop-blur border border-white/15 text-white/80 font-medium">
                   {callType === "video" ? "Video call" : "Voice call"}
                 </span>
               </div>
@@ -1565,8 +1565,8 @@ export default function Chat() {
                   </div>
                 </div>
                 <div className="text-center">
-                  <h2 className="text-2xl font-extrabold drop-shadow-lg">Call ended</h2>
-                  <p className="mt-1.5 text-sm text-white/60">
+                  <h2 className="text-xl font-extrabold drop-shadow-lg">Call ended</h2>
+                  <p className="mt-1.5 text-xs text-white/60">
                     {endedInfo.name} · {fmtTime(endedInfo.durationSec)}
                   </p>
                 </div>
@@ -1647,38 +1647,31 @@ export default function Chat() {
                             const isVideo = meta.callType === "video";
                             const kindLabel = isVideo ? "Video" : "Voice";
                             const isCaller = String(m.sender?._id || m.sender) === String(user?._id);
-                            let Icon, iconCls, label;
+                            let label;
                             if (meta.status === "completed") {
-                              Icon = isVideo ? LuVideo : LuPhone;
-                              iconCls = "text-emerald-500";
-                              label = `${kindLabel} call`;
-                            } else if (meta.status === "declined") {
-                              Icon = LuPhoneOff;
-                              iconCls = "text-red-500";
-                              label = isCaller
-                                ? `${kindLabel} call declined`
-                                : `Missed ${kindLabel.toLowerCase()} call`;
+                              const d = fmtDur(meta.durationSec);
+                              label = `${kindLabel} call${d ? ` · ${d}` : ""}`;
+                            } else if (isCaller) {
+                              label = meta.status === "declined" ? "Your call declined" : "No answer";
                             } else {
-                              Icon = isVideo ? LuVideoOff : LuPhoneOff;
-                              iconCls = "text-slate-400";
-                              label = isCaller
-                                ? `No answer — ${kindLabel.toLowerCase()} call`
-                                : `Missed ${kindLabel.toLowerCase()} call`;
+                              label = `Missed ${kindLabel.toLowerCase()} call`;
                             }
+                            const stamp = new Date(m.createdAt).toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            });
                             return (
-                              /* Borderless tiny centered text — sits between
-                                 messages like a system note, never steals
-                                 bubble space. Shows "4 min 21 sec" style
-                                 duration for answered calls. */
+                              /* Borderless tiny centered text — no icons, no
+                                 inline clock. Hover reveals the send time
+                                 (desktop only) beside the note. */
                               <div key={m._id} className="flex justify-center py-0.5">
-                                <span className="inline-flex items-center gap-1 text-[11px] leading-none text-slate-400 select-none">
-                                  <Icon className={`${iconCls} w-3 h-3 shrink-0`} />
-                                  <span className="text-slate-400">{label}</span>
-                                  {meta.status === "completed" && fmtDur(meta.durationSec) && (
-                                    <span>· {fmtDur(meta.durationSec)}</span>
-                                  )}
-                                  <span>
-                                    · {new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                <span
+                                  title={stamp}
+                                  className="group/call relative inline-flex items-center select-none text-[10px] leading-none text-slate-400"
+                                >
+                                  {label}
+                                  <span className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-1.5 text-[9px] text-slate-300 opacity-0 group-hover/call:opacity-100 transition whitespace-nowrap max-sm:hidden">
+                                    {stamp}
                                   </span>
                                 </span>
                               </div>
@@ -1795,7 +1788,7 @@ export default function Chat() {
                                       onClick={() => setMsgMenuId(msgMenuId === m._id ? null : m._id)}
                                       title="Message options"
                                       aria-label="Message options"
-                                      className="p-1 rounded-full bg-white/90 border border-slate-200 text-slate-500 hover:text-slate-800 shadow-sm opacity-0 group-hover/msg:opacity-100 focus:opacity-100 max-sm:opacity-70 transition"
+                                      className="p-1 rounded-full bg-white/90 border border-slate-200 text-slate-500 hover:text-slate-800 shadow-sm opacity-0 group-hover/msg:opacity-100 focus:opacity-100 max-sm:hidden transition"
                                     >
                                       <FiMoreVertical size={13} />
                                     </button>
@@ -1849,7 +1842,7 @@ export default function Chat() {
                                         className="group/emoji relative p-0.5 emoji-pop"
                                         style={{ animationDelay: `${i * 45}ms` }}
                                       >
-                                        <span className="block text-2xl leading-none transition-transform duration-150 group-hover/emoji:scale-[1.7] group-hover/emoji:-translate-y-1.5">
+                                        <span className="block text-xl sm:text-2xl leading-none transition-transform duration-150 group-hover/emoji:scale-[1.7] group-hover/emoji:-translate-y-1.5">
                                           {r.emoji}
                                         </span>
                                         <span className="pointer-events-none absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md bg-slate-800 text-white text-[10px] px-1.5 py-0.5 opacity-0 group-hover/emoji:opacity-100 transition">
@@ -1857,6 +1850,38 @@ export default function Chat() {
                                         </span>
                                       </button>
                                     ))}
+                                    {/* Edit/Delete live inside the picker too —
+                                        the 3-dot is hidden on mobile, so this
+                                        is the touch path to both actions */}
+                                    {(isMe || isAdmin) && (
+                                      <>
+                                        <span className="w-px self-stretch bg-slate-200 mx-0.5" />
+                                        {isMe && (
+                                          <button
+                                            onPointerDown={(e) => e.stopPropagation()}
+                                            onClick={() => {
+                                              setReactPickerFor(null);
+                                              startEdit(m);
+                                            }}
+                                            title="Edit message"
+                                            className="p-1.5 text-slate-500 hover:text-brand transition"
+                                          >
+                                            <FiEdit2 className="w-4 h-4" />
+                                          </button>
+                                        )}
+                                        <button
+                                          onPointerDown={(e) => e.stopPropagation()}
+                                          onClick={() => {
+                                            setReactPickerFor(null);
+                                            removeMessage(m._id);
+                                          }}
+                                          title="Delete message"
+                                          className="p-1.5 text-slate-500 hover:text-red-500 transition"
+                                        >
+                                          <FiTrash2 className="w-4 h-4" />
+                                        </button>
+                                      </>
+                                    )}
                                   </div>
                                 )}
 
@@ -1886,16 +1911,25 @@ export default function Chat() {
                                   );
                                 })()}
                               </div>
-                              {/* Time under every bubble; "Seen" only on my LAST message */}
-                              <div className={`text-[10px] text-slate-400 mt-0.5 ${isMe ? "text-right" : "text-left ml-8"}`}>
-                                {fmtMsgTime(m.createdAt)}
-                                {isMe && m._id === lastOwnMessageId && (
+                              {/* "Seen"/"Sent" only on my LAST message — the
+                                  timestamp itself is hover-only so bubbles
+                                  never feel crowded with metadata */}
+                              {isMe && m._id === lastOwnMessageId && (
+                                <div className="text-[9px] text-slate-400 mt-0.5 text-right">
                                   <span className={Array.isArray(m.readBy) && m.readBy.some((r) => String(r) !== String(user?._id)) ? "text-emerald-500 font-medium" : ""}>
-                                    {" · "}
                                     {Array.isArray(m.readBy) && m.readBy.some((r) => String(r) !== String(user?._id)) ? "Seen" : "Sent"}
                                   </span>
-                                )}
-                              </div>
+                                </div>
+                              )}
+                              {/* Send-time — hidden until hover (desktop only);
+                                  sits OUTSIDE the bubble beside the 3-dot so
+                                  the two never overlap */}
+                              <span
+                                title={fmtMsgTime(m.createdAt)}
+                                className={`pointer-events-none absolute top-1/2 -translate-y-1/2 text-[9px] text-slate-400 opacity-0 group-hover/msg:opacity-100 transition whitespace-nowrap max-sm:hidden ${isMe ? "right-full mr-8" : "left-full ml-8"}`}
+                              >
+                                {fmtMsgTime(m.createdAt)}
+                              </span>
                             </div>
                           </div>
                         ),

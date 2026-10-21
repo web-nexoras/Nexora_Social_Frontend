@@ -65,12 +65,12 @@ export default function IncomingCallOverlay() {
 
         {/* Glass identity card */}
         <div className="w-full max-w-sm rounded-3xl bg-white/10 backdrop-blur-xl border border-white/15 px-6 py-6 text-center shadow-[0_20px_60px_rgba(0,0,0,0.45)]">
-          <p className="text-[11px] uppercase tracking-[0.35em] text-indigo-200/80 mb-2 flex items-center justify-center gap-2">
+          <p className="text-[10px] uppercase tracking-[0.35em] text-indigo-200/80 mb-2 flex items-center justify-center gap-2">
             {isVideo ? <LuVideo /> : <LuMic />}
             Incoming {isVideo ? "video" : "voice"} call
           </p>
-          <h2 className="text-2xl sm:text-3xl font-extrabold mb-3 drop-shadow-lg truncate px-2">{name}</h2>
-          <p className="flex items-center justify-center gap-2.5 text-sm text-white/60">
+          <h2 className="text-xl sm:text-2xl font-extrabold mb-3 drop-shadow-lg truncate px-2">{name}</h2>
+          <p className="flex items-center justify-center gap-2.5 text-xs text-white/60">
             Ringing
             <span className="flex gap-1 pb-0.5">
               <span className="w-1.5 h-1.5 rounded-full bg-white/70 animate-bounce" />
