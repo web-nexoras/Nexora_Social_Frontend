@@ -3,7 +3,6 @@ import { paymentsApi } from "../api/groupsApi";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { FiCheck, FiX, FiUsers, FiClock, FiCreditCard, FiTrash2 } from "react-icons/fi";
-import InlineLoader from "../components/InlineLoader";
 import Skeleton from "../components/Skeleton";
 
 const fmtDate = (d) => (d ? new Date(d).toLocaleDateString() : "—");

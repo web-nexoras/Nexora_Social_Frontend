@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { friendsApi } from "../api/friendsApi";
 import { useToast } from "../context/ToastContext";
-import InlineLoader from "../components/InlineLoader";
 import Skeleton from "../components/Skeleton";
 
 const TABS = ["Suggestions", "Incoming", "Sent", "Friends"];

@@ -3,7 +3,6 @@ import { usersApi } from "../api/usersApi";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { FiCheck, FiX } from "react-icons/fi";
-import InlineLoader from "../components/InlineLoader";
 import Skeleton from "../components/Skeleton";
 
 export default function AdminUsers() {

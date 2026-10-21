@@ -170,7 +170,7 @@ select:not(.neo-input):focus {
 .dark .bg-brand { background-color: #3b4657; }
 .dark .text-brand { color: #cbd5e1; }
 
-/* Emoji reaction picker — staggered pop-in for each emoji */
+/* Emoji reaction picker ï¿½ staggered pop-in for each emoji */
 @keyframes emoji-pop {
   from {
     opacity: 0;
@@ -183,4 +183,19 @@ select:not(.neo-input):focus {
 }
 .emoji-pop {
   animation: emoji-pop 0.22s ease-out both;
+}
+
+/* Call screens (incoming / outgoing / ended) â€” smooth premium entrance */
+@keyframes call-enter {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.call-enter {
+  animation: call-enter 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
 }

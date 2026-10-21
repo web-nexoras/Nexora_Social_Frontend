@@ -92,29 +92,54 @@ export function SocketProvider({ children }) {
       document.addEventListener("pointerdown", resume, { once: true });
       document.addEventListener("touchstart", resume, { once: true, passive: true });
       resume();
+      // Master bus with a compressor so the ring can be LOUD without clipping.
+      const master = ctx.createGain();
+      master.gain.value = 0.9;
+      const comp = ctx.createDynamicsCompressor();
+      comp.threshold.value = -16;
+      comp.ratio.value = 8;
+      master.connect(comp);
+      comp.connect(ctx.destination);
+
+      const tone = (freq, at, dur, vol = 0.5, type = "triangle") => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = type;
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.0001, at);
+        gain.gain.exponentialRampToValueAtTime(vol, at + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+        osc.connect(gain);
+        gain.connect(master);
+        osc.start(at);
+        osc.stop(at + dur + 0.05);
+      };
+
       const beep = () => {
         try {
           const now = ctx.currentTime;
-          const notes = kind === "ringback" ? [425] : [660, 880];
-          notes.forEach((freq, i) => {
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.type = "sine";
-            osc.frequency.value = freq;
-            gain.gain.setValueAtTime(0.0001, now);
-            gain.gain.exponentialRampToValueAtTime(0.1, now + 0.03);
-            gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.32 + i * 0.35);
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.start(now + i * 0.35);
-            osc.stop(now + i * 0.35 + 0.35);
-          });
+          if (kind === "ringback") {
+            // Real-telecom dual-tone ringback (425 + 450 Hz) — clean and loud.
+            tone(425, now, 1.2, 0.45, "sine");
+            tone(450, now, 1.2, 0.45, "sine");
+          } else {
+            // Bright marimba-style ringtone (E5 · G#5 · B5 · E6) + sparkle
+            // overtones, with a softer echo pass — loud, pleasant, premium.
+            const notes = [659.25, 830.61, 987.77, 1318.51];
+            notes.forEach((f, i) => {
+              tone(f, now + i * 0.16, 0.5, 0.55);
+              tone(f * 2, now + i * 0.16, 0.28, 0.12, "sine");
+            });
+            notes.slice(0, 3).forEach((f, i) => {
+              tone(f, now + 0.85 + i * 0.16, 0.45, 0.32);
+            });
+          }
         } catch {
           /* ignore */
         }
       };
       beep();
-      ringRef.current.timer = setInterval(beep, kind === "ringback" ? 3500 : 2500);
+      ringRef.current.timer = setInterval(beep, kind === "ringback" ? 3500 : 2400);
     } catch {
       // Audio is optional and may be blocked by browser policy.
     }

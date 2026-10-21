@@ -10,7 +10,6 @@ import { friendsApi } from "../api/friendsApi";
 import { followsApi } from "../api/followsApi";
 import { ICE_SERVERS } from "../api/config";
 import PaymentMethodModal from "../components/PaymentMethodModal";
-import InlineLoader from "../components/InlineLoader";
 import Skeleton from "../components/Skeleton";
 import {
   FiBell,
@@ -24,17 +23,20 @@ import {
   FiArrowLeft,
   FiSearch,
   FiUserPlus,
-  FiPhone,
-  FiVideo,
   FiSmile,
   FiBookmark,
   FiInfo,
-  FiPhoneOff,
-  FiMic,
-  FiMicOff,
-  FiVideoOff,
-  FiMinimize2,
 } from "react-icons/fi";
+import {
+  LuPhone,
+  LuPhoneOff,
+  LuVideo,
+  LuVideoOff,
+  LuMic,
+  LuMicOff,
+  LuMinimize2,
+  LuRefreshCw,
+} from "react-icons/lu";
 
 // FB-style message reactions (long-press the bubble to open the picker)
 const MSG_REACTIONS = [
@@ -117,7 +119,7 @@ export default function Chat() {
   const [msgMenuId, setMsgMenuId] = useState(null); // message 3-dot menu
   const [reactPickerFor, setReactPickerFor] = useState(null); // long-press reaction picker
   const pressTimerRef = useRef(null); // long-press timer
-  const pickerOpenedAtRef = useRef(0); // ignores the click that follows a long-press
+  const swallowNextClickRef = useRef(false); // eats the trailing click after a long-press (mobile)
   const [editText, setEditText] = useState("");
   // Call UI: inCall = media session exists, callPhase = "calling" (ringing out)
   // or "connected" (answered).
@@ -128,6 +130,9 @@ export default function Chat() {
   const [muted, setMuted] = useState(false);
   const [camOff, setCamOff] = useState(false);
   const [callMinimized, setCallMinimized] = useState(false);
+  const [videoSwapped, setVideoSwapped] = useState(false); // Messenger-style tap-to-swap videos
+  const [endedInfo, setEndedInfo] = useState(null); // { durationSec, name } on the "Call ended" screen
+  const endScreenTimerRef = useRef(null);
   const pcRef = useRef(null);
   const localStreamRef = useRef(null);
   const remoteAudioRef = useRef(null);
@@ -141,6 +146,14 @@ export default function Chat() {
 
   const fmtTime = (s) =>
     `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+  // Human-readable call duration for the in-chat call log: "45 sec" / "4 min 21 sec"
+  const fmtDur = (s) => {
+    if (!s || s <= 0) return null;
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    if (!m) return `${sec} sec`;
+    return sec ? `${m} min ${sec} sec` : `${m} min`;
+  };
 
   // Live mirror of callPhase for socket handlers (avoids stale closures).
   const callPhaseRef = useRef(null);
@@ -172,7 +185,12 @@ export default function Chat() {
     if (inCall) return;
     const kind = type === "video" ? "video" : "audio";
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: kind === "video" });
+      // Noise suppression + echo cancellation + auto gain — keeps background
+      // noise out of the call (crystal-clear voice, Messenger-style).
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { noiseSuppression: true, echoCancellation: true, autoGainControl: true },
+        video: kind === "video",
+      });
       localStreamRef.current = stream;
       const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
       pcRef.current = pc;
@@ -206,6 +224,9 @@ export default function Chat() {
       setMuted(false);
       setCamOff(false);
       setCallMinimized(false);
+      setVideoSwapped(false);
+      setEndedInfo(null);
+      if (endScreenTimerRef.current) clearTimeout(endScreenTimerRef.current);
       if (localVideoRef.current) localVideoRef.current.srcObject = stream;
       startRing("ringback"); // ringback tone until the other side answers
       if (ringTimeoutRef.current) clearTimeout(ringTimeoutRef.current);
@@ -225,7 +246,11 @@ export default function Chat() {
     stopRing();
     if (ringTimeoutRef.current) clearTimeout(ringTimeoutRef.current);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: incomingCall.callType === "video" });
+      // Same clean-audio constraints on the accepting side.
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { noiseSuppression: true, echoCancellation: true, autoGainControl: true },
+        video: incomingCall.callType === "video",
+      });
       localStreamRef.current = stream;
       const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
       pcRef.current = pc;
@@ -256,6 +281,8 @@ export default function Chat() {
       setMuted(false);
       setCamOff(false);
       setCallMinimized(false);
+      setVideoSwapped(false);
+      setEndedInfo(null);
       if (localVideoRef.current) localVideoRef.current.srcObject = stream;
       clearIncomingCall();
       setCallPendingAccept(false);
@@ -280,6 +307,10 @@ export default function Chat() {
     if (localVideoRef.current) localVideoRef.current.srcObject = null;
     if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null;
     remoteStreamRef.current = null;
+    const wasAnswered = answeredRef.current; // a real conversation → show "Call ended"
+    const endedDuration = callSeconds;
+    const endedName = otherParticipantRef.current?.fullname || "";
+    answeredRef.current = false;
     setInCall(false);
     setCallPhase(null);
     setCallType("audio");
@@ -287,11 +318,18 @@ export default function Chat() {
     setCallSeconds(0);
     setMuted(false);
     setCamOff(false);
+    setVideoSwapped(false);
     const to = incomingCall?.from || otherParticipantRef.current?._id;
     clearIncomingCall();
     setCallPendingAccept(false);
     // notify=false when the remote side already told us the call ended
     if (notify && socket && to) socket.emit("call:end", { to });
+    // Messenger-style "Call ended" splash — name + duration, auto-hides.
+    if (wasAnswered && endedName) {
+      setEndedInfo({ durationSec: endedDuration, name: endedName });
+      if (endScreenTimerRef.current) clearTimeout(endScreenTimerRef.current);
+      endScreenTimerRef.current = setTimeout(() => setEndedInfo(null), 2400);
+    }
   };
 
   const toggleMute = () => {
@@ -699,7 +737,12 @@ export default function Chat() {
   const startPress = (m) => {
     clearTimeout(pressTimerRef.current);
     pressTimerRef.current = setTimeout(() => {
-      pickerOpenedAtRef.current = Date.now();
+      // The finger-lift after a long-press fires a trailing click that would
+      // instantly close the picker — swallow exactly that one click.
+      swallowNextClickRef.current = true;
+      setTimeout(() => {
+        swallowNextClickRef.current = false;
+      }, 900);
       setReactPickerFor(m._id);
     }, 450);
   };
@@ -729,10 +772,12 @@ export default function Chat() {
   useEffect(() => {
     if (!msgMenuId && !reactPickerFor) return;
     const close = (e) => {
-      // a long-press fires a trailing click on the bubble — don't let it
-      // instantly close the picker we just opened
-      if (Date.now() - pickerOpenedAtRef.current < 400) return;
       if (e.target.closest?.("[data-msg-menu]") || e.target.closest?.("[data-react-picker]")) return;
+      // swallow the single trailing click that follows a long-press open
+      if (swallowNextClickRef.current) {
+        swallowNextClickRef.current = false;
+        return;
+      }
       setMsgMenuId(null);
       setReactPickerFor(null);
     };
@@ -1309,11 +1354,11 @@ export default function Chat() {
             )}
             {activeConv?.type === "direct" && otherParticipant && (
               <div className="shrink-0 flex items-center gap-1 sm:gap-2">
-                <button onClick={() => startCall("audio")} className="shrink-0 p-2 rounded-full hover:bg-indigo-50 text-slate-600 hover:text-brand" title="Voice call">
-                  <FiPhone />
+                <button onClick={() => startCall("audio")} className="shrink-0 p-2 rounded-full bg-indigo-50 hover:bg-indigo-100 text-brand transition" title="Voice call">
+                  <LuPhone className="w-4 h-4" />
                 </button>
-                <button onClick={() => startCall("video")} className="shrink-0 p-2 rounded-full hover:bg-indigo-50 text-slate-600 hover:text-brand" title="Video call">
-                  <FiVideo />
+                <button onClick={() => startCall("video")} className="shrink-0 p-2 rounded-full bg-indigo-50 hover:bg-indigo-100 text-brand transition" title="Video call">
+                  <LuVideo className="w-4 h-4" />
                 </button>
                 <button onClick={() => showToast("Info panel coming soon", "info")} className="p-2 rounded-full hover:bg-indigo-50 text-slate-600 hover:text-brand max-sm:hidden" title="Info">
                   <FiInfo />
@@ -1345,14 +1390,14 @@ export default function Chat() {
               <div className="absolute inset-0 bg-gradient-to-b from-[#0f172a]/85 via-[#1e1b4b]/90 to-[#020617]/95" />
               <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-[520px] h-[520px] rounded-full bg-indigo-500/20 blur-[120px] pointer-events-none" />
               <div className="relative h-full flex flex-col items-center justify-center px-6 py-10">
-                <div className="relative w-36 h-36 mb-9 shrink-0">
+                <div className="relative w-28 h-28 sm:w-36 sm:h-36 mb-9 shrink-0">
                   <span className="absolute inset-0 rounded-full bg-indigo-400/30 animate-ping" />
                   <span className="absolute -inset-4 rounded-full bg-indigo-400/20 animate-ping [animation-delay:300ms]" />
                   <span className="absolute -inset-9 rounded-full bg-indigo-400/10 animate-ping [animation-delay:600ms]" />
                   <img
                     src={otherParticipant?.avatar || "https://via.placeholder.com/200"}
                     alt=""
-                    className="relative w-36 h-36 rounded-full object-cover border-4 border-white/80 shadow-[0_0_60px_rgba(99,102,241,0.45)]"
+                    className="relative w-28 h-28 sm:w-36 sm:h-36 rounded-full object-cover border-4 border-white/80 shadow-[0_0_60px_rgba(99,102,241,0.45)]"
                   />
                 </div>
                 <p className="text-[11px] uppercase tracking-[0.35em] text-indigo-200/80 mb-3 text-center">
@@ -1360,16 +1405,16 @@ export default function Chat() {
                 </p>
                 <h2 className="text-3xl font-extrabold mb-3 text-center drop-shadow-lg">{otherParticipant?.fullname || "…"}</h2>
                 <p className="flex items-center gap-2.5 text-sm text-white/60 mb-14">
-                  Calling
+                  Calling {otherParticipant?.fullname?.split(" ")[0] || ""}
                   <span className="flex gap-1 pb-0.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-white/70 animate-bounce" />
                     <span className="w-1.5 h-1.5 rounded-full bg-white/70 animate-bounce [animation-delay:150ms]" />
                     <span className="w-1.5 h-1.5 rounded-full bg-white/70 animate-bounce [animation-delay:300ms]" />
                   </span>
                 </p>
-                <button onClick={() => endCall()} className="flex flex-col items-center gap-3 group" aria-label="Cancel call">
-                  <span className="w-[72px] h-[72px] rounded-full bg-gradient-to-br from-red-500 to-red-600 shadow-[0_10px_30px_rgba(239,68,68,0.45)] flex items-center justify-center transition group-hover:scale-105 group-active:scale-95">
-                    <FiPhoneOff className="w-8 h-8" />
+                <button onClick={() => endCall()} className="flex flex-col items-center gap-2.5 group" aria-label="Cancel call">
+                  <span className="w-16 h-16 rounded-full bg-gradient-to-br from-red-500 to-red-600 shadow-[0_10px_30px_rgba(239,68,68,0.45)] flex items-center justify-center transition group-hover:scale-105 group-active:scale-95">
+                    <LuPhoneOff className="w-6 h-6" />
                   </span>
                   <span className="text-xs text-white/70 group-hover:text-white transition">Cancel</span>
                 </button>
@@ -1401,85 +1446,140 @@ export default function Chat() {
                   {callType === "video" ? "Video call" : "Voice call"}
                 </span>
               </div>
-              {/* Media */}
-              <div className="relative flex-1 flex items-center justify-center p-4 sm:p-6 min-h-0">
+              {/* Media — Messenger-style. Tap either video to swap big/small. */}
+              <div className="relative flex-1 min-h-0">
                 {callType === "video" ? (
                   <>
+                    {/* Remote (big by default) */}
                     <video
                       ref={remoteVideoRef}
                       autoPlay
                       playsInline
-                      className="max-h-full max-w-full rounded-3xl bg-black object-contain shadow-[0_0_80px_rgba(0,0,0,0.6)] border border-white/10"
+                      onClick={() => setVideoSwapped((s) => !s)}
+                      className={`absolute bg-black object-cover cursor-pointer transition-all ${
+                        videoSwapped
+                          ? "bottom-4 right-4 z-10 w-28 sm:w-40 aspect-[3/4] rounded-2xl border-2 border-white/25 shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
+                          : "inset-0 w-full h-full"
+                      }`}
                     />
+                    {/* Local (small PIP by default, mirrored) */}
                     <video
                       ref={localVideoRef}
                       autoPlay
                       playsInline
                       muted
-                      className={`absolute bottom-4 right-4 w-28 sm:w-44 aspect-[3/4] rounded-2xl object-cover border-2 border-white/25 shadow-[0_8px_30px_rgba(0,0,0,0.5)] -scale-x-100 transition ${camOff ? "opacity-0" : ""}`}
+                      onClick={() => setVideoSwapped((s) => !s)}
+                      className={`absolute bg-black object-cover -scale-x-100 cursor-pointer transition-all ${
+                        videoSwapped
+                          ? "inset-0 w-full h-full"
+                          : "bottom-4 right-4 z-10 w-28 sm:w-40 aspect-[3/4] rounded-2xl border-2 border-white/25 shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
+                      } ${camOff ? "opacity-0" : ""}`}
                     />
+                    {/* Cam-off state over the big view */}
+                    {camOff && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-slate-900/90 pointer-events-none">
+                        <div className="text-center">
+                          <img
+                            src={videoSwapped ? user?.avatar || "https://via.placeholder.com/120" : otherParticipant?.avatar || "https://via.placeholder.com/120"}
+                            alt=""
+                            className="w-28 h-28 mx-auto rounded-full object-cover border-4 border-white/20 opacity-80"
+                          />
+                          <p className="mt-3 text-sm text-white/60">{videoSwapped ? "Your camera is off" : `${otherParticipant?.fullname?.split(" ")[0] || "They"}'s camera is off`}</p>
+                        </div>
+                      </div>
+                    )}
                   </>
                 ) : (
-                  <div className="relative w-44 h-44">
+                  <div className="relative w-36 h-36 sm:w-44 sm:h-44">
                     <span className="absolute inset-0 rounded-full bg-indigo-400/25 animate-ping" />
                     <span className="absolute -inset-5 rounded-full bg-indigo-400/15 animate-ping [animation-delay:300ms]" />
                     <span className="absolute -inset-10 rounded-full bg-indigo-400/10 animate-ping [animation-delay:600ms]" />
                     <img
                       src={otherParticipant?.avatar || "https://via.placeholder.com/176"}
                       alt=""
-                      className="relative w-44 h-44 rounded-full object-cover border-4 border-white/70 shadow-[0_0_70px_rgba(99,102,241,0.4)]"
+                      className="relative w-36 h-36 sm:w-44 sm:h-44 rounded-full object-cover border-4 border-white/70 shadow-[0_0_70px_rgba(99,102,241,0.4)]"
                     />
                   </div>
                 )}
               </div>
               {/* Floating glass control bar */}
               <div className="relative flex items-center justify-center px-4 pb-8 pt-4">
-                <div className="flex items-center gap-3 sm:gap-4 rounded-full bg-white/10 backdrop-blur-xl border border-white/15 px-5 py-3 shadow-[0_8px_40px_rgba(0,0,0,0.5)]">
+                <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 rounded-full bg-white/10 backdrop-blur-xl border border-white/15 px-4 py-2.5 shadow-[0_8px_40px_rgba(0,0,0,0.5)] max-w-[94vw]">
                   <button
                     onClick={toggleMute}
                     title={muted ? "Unmute" : "Mute"}
-                    className={`w-[54px] h-[54px] rounded-full flex items-center justify-center transition ${
+                    className={`w-11 h-11 rounded-full flex items-center justify-center transition ${
                       muted ? "bg-white text-red-500 shadow-[0_0_20px_rgba(255,255,255,0.25)]" : "bg-white/10 hover:bg-white/20"
                     }`}
                   >
-                    {muted ? <FiMicOff className="w-6 h-6" /> : <FiMic className="w-6 h-6" />}
+                    {muted ? <LuMicOff className="w-5 h-5" /> : <LuMic className="w-5 h-5" />}
                   </button>
                   {callType === "video" && (
                     <button
                       onClick={toggleCam}
                       title={camOff ? "Turn camera on" : "Turn camera off"}
-                      className={`w-[54px] h-[54px] rounded-full flex items-center justify-center transition ${
+                      className={`w-11 h-11 rounded-full flex items-center justify-center transition ${
                         camOff ? "bg-white text-red-500 shadow-[0_0_20px_rgba(255,255,255,0.25)]" : "bg-white/10 hover:bg-white/20"
                       }`}
                     >
-                      {camOff ? <FiVideoOff className="w-6 h-6" /> : <FiVideo className="w-6 h-6" />}
+                      {camOff ? <LuVideoOff className="w-5 h-5" /> : <LuVideo className="w-5 h-5" />}
+                    </button>
+                  )}
+                  {callType === "video" && (
+                    <button
+                      onClick={() => setVideoSwapped((s) => !s)}
+                      title="Swap videos"
+                      className="w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition"
+                    >
+                      <LuRefreshCw className="w-5 h-5" />
                     </button>
                   )}
                   <button
                     onClick={() => setCallMinimized(true)}
                     title="Minimize"
-                    className="w-[54px] h-[54px] rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition"
+                    className="w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition"
                   >
-                    <FiMinimize2 className="w-6 h-6" />
+                    <LuMinimize2 className="w-5 h-5" />
                   </button>
                   <button
                     onClick={() => endCall()}
                     title="End call"
-                    className="w-[54px] h-[54px] rounded-full bg-gradient-to-br from-red-500 to-red-600 shadow-[0_10px_30px_rgba(239,68,68,0.5)] flex items-center justify-center transition hover:scale-105 active:scale-95"
+                    className="w-11 h-11 rounded-full bg-gradient-to-br from-red-500 to-red-600 shadow-[0_10px_30px_rgba(239,68,68,0.5)] flex items-center justify-center transition hover:scale-105 active:scale-95"
                   >
-                    <FiPhoneOff className="w-6 h-6" />
+                    <LuPhoneOff className="w-5 h-5" />
                   </button>
+                </div>
+              </div>
+            </div>
+          )}
+          {/* Messenger-style "Call ended" splash — auto-hides after ~2.4s */}
+          {endedInfo && (
+            <div className="call-enter fixed inset-0 z-[85] flex items-center justify-center text-white select-none pointer-events-none">
+              <div className="absolute inset-0 bg-gradient-to-b from-[#0f172a]/70 via-[#1e1b4b]/75 to-[#020617]/80 backdrop-blur-md" />
+              <div className="relative flex flex-col items-center gap-4 px-6">
+                <div className="relative w-28 h-28">
+                  <span className="absolute inset-0 rounded-full bg-red-400/25 animate-ping" />
+                  <span className="absolute -inset-3 rounded-full bg-red-400/10 animate-ping [animation-delay:300ms]" />
+                  <div className="relative w-28 h-28 rounded-full bg-gradient-to-br from-red-500 to-red-600 shadow-[0_15px_45px_rgba(239,68,68,0.5)] flex items-center justify-center">
+                    <LuPhoneOff className="w-11 h-11" />
+                  </div>
+                </div>
+                <div className="text-center">
+                  <h2 className="text-2xl font-extrabold drop-shadow-lg">Call ended</h2>
+                  <p className="mt-1.5 text-sm text-white/60">
+                    {endedInfo.name} · {fmtTime(endedInfo.durationSec)}
+                  </p>
                 </div>
               </div>
             </div>
           )}
           {/* Minimized call bar */}
           {inCall && callPhase === "connected" && callMinimized && (
-            <div className="fixed top-20 right-4 z-[80] flex items-center gap-3 rounded-2xl bg-slate-900/80 backdrop-blur-xl border border-white/10 shadow-[0_8px_40px_rgba(0,0,0,0.45)] px-4 py-3 text-white">
+            <div className="fixed top-20 right-2 sm:right-4 left-2 sm:left-auto z-[80] flex items-center justify-center sm:justify-start gap-2.5 sm:gap-3 rounded-2xl bg-slate-900/80 backdrop-blur-xl border border-white/10 shadow-[0_8px_40px_rgba(0,0,0,0.45)] px-3 sm:px-4 py-3 text-white max-w-[calc(100vw-1rem)] sm:max-w-none">
               <img
                 src={otherParticipant?.avatar || "https://via.placeholder.com/40"}
                 alt=""
-                className="w-10 h-10 rounded-full object-cover border-2 border-white/20"
+                className="w-10 h-10 shrink-0 rounded-full object-cover border-2 border-white/20"
               />
               <div className="min-w-0">
                 <p className="text-sm font-semibold truncate max-w-[120px]">{otherParticipant?.fullname || "…"}</p>
@@ -1490,7 +1590,7 @@ export default function Chat() {
               </div>
               <button
                 onClick={() => setCallMinimized(false)}
-                className="px-3.5 py-1.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 text-white text-sm font-medium transition"
+                className="shrink-0 px-3.5 py-1.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 text-white text-sm font-medium transition"
               >
                 Open
               </button>
@@ -1499,7 +1599,7 @@ export default function Chat() {
                 title="End call"
                 className="w-10 h-10 rounded-full bg-gradient-to-br from-red-500 to-red-600 shadow-[0_6px_20px_rgba(239,68,68,0.5)] flex items-center justify-center transition hover:scale-105 active:scale-95"
               >
-                <FiPhoneOff className="w-4 h-4" />
+                <LuPhoneOff className="w-4 h-4" />
               </button>
             </div>
           )}
@@ -1549,34 +1649,38 @@ export default function Chat() {
                             const isCaller = String(m.sender?._id || m.sender) === String(user?._id);
                             let Icon, iconCls, label;
                             if (meta.status === "completed") {
-                              Icon = isVideo ? FiVideo : FiPhone;
+                              Icon = isVideo ? LuVideo : LuPhone;
                               iconCls = "text-emerald-500";
                               label = `${kindLabel} call`;
                             } else if (meta.status === "declined") {
-                              Icon = FiPhoneOff;
+                              Icon = LuPhoneOff;
                               iconCls = "text-red-500";
                               label = isCaller
                                 ? `${kindLabel} call declined`
                                 : `Missed ${kindLabel.toLowerCase()} call`;
                             } else {
-                              Icon = isVideo ? FiVideoOff : FiPhoneOff;
+                              Icon = isVideo ? LuVideoOff : LuPhoneOff;
                               iconCls = "text-slate-400";
                               label = isCaller
                                 ? `No answer — ${kindLabel.toLowerCase()} call`
                                 : `Missed ${kindLabel.toLowerCase()} call`;
                             }
                             return (
-                              <div key={m._id} className="flex justify-center py-1">
-                                <div className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs shadow-sm text-slate-500">
-                                  <Icon className={`${iconCls} shrink-0`} />
-                                  <span className="font-medium text-slate-600">{label}</span>
-                                  {meta.status === "completed" && meta.durationSec > 0 && (
-                                    <span>· {fmtTime(meta.durationSec)}</span>
+                              /* Borderless tiny centered text — sits between
+                                 messages like a system note, never steals
+                                 bubble space. Shows "4 min 21 sec" style
+                                 duration for answered calls. */
+                              <div key={m._id} className="flex justify-center py-0.5">
+                                <span className="inline-flex items-center gap-1 text-[11px] leading-none text-slate-400 select-none">
+                                  <Icon className={`${iconCls} w-3 h-3 shrink-0`} />
+                                  <span className="text-slate-400">{label}</span>
+                                  {meta.status === "completed" && fmtDur(meta.durationSec) && (
+                                    <span>· {fmtDur(meta.durationSec)}</span>
                                   )}
-                                  <span className="text-slate-400">
+                                  <span>
                                     · {new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                                   </span>
-                                </div>
+                                </span>
                               </div>
                             );
                           })()
@@ -1615,7 +1719,7 @@ export default function Chat() {
                         ) : (
                           <div
                             key={m._id}
-                            className="group/msg relative flex items-end gap-2"
+                            className={`group/msg relative flex items-end gap-2 ${isMe ? "justify-end" : ""}`}
                           >
                             {!isMe && (
                               <div className="relative shrink-0">
@@ -1664,13 +1768,12 @@ export default function Chat() {
                                   onPointerCancel={cancelPress}
                                   onContextMenu={(e) => {
                                     e.preventDefault();
-                                    pickerOpenedAtRef.current = Date.now();
                                     setReactPickerFor(m._id);
                                   }}
-                                  className={`px-4 py-2 rounded-2xl transition select-none break-words ${
+                                  className={`px-3.5 py-1.5 text-[13px] leading-snug rounded-[18px] transition select-none break-words ${
                                     isMe
-                                      ? "bg-brand text-white rounded-br-sm"
-                                      : "bg-slate-100 text-slate-800 rounded-bl-sm"
+                                      ? "bg-brand text-white rounded-br-md"
+                                      : "bg-slate-100 text-slate-800 rounded-bl-md"
                                   }`}
                                 >
                                   {m.text}
@@ -1681,19 +1784,67 @@ export default function Chat() {
                                   )}
                                 </div>
 
+                                {/* 3-dot — anchored to the bubble itself so it is
+                                    always level with the message (never high/low) */}
+                                {(isMe || isAdmin) && (
+                                  <div
+                                    data-msg-menu
+                                    className={`absolute top-1/2 -translate-y-1/2 ${isMe ? "right-full mr-1.5" : "left-full ml-1.5"} z-30`}
+                                  >
+                                    <button
+                                      onClick={() => setMsgMenuId(msgMenuId === m._id ? null : m._id)}
+                                      title="Message options"
+                                      aria-label="Message options"
+                                      className="p-1 rounded-full bg-white/90 border border-slate-200 text-slate-500 hover:text-slate-800 shadow-sm opacity-0 group-hover/msg:opacity-100 focus:opacity-100 max-sm:opacity-70 transition"
+                                    >
+                                      <FiMoreVertical size={13} />
+                                    </button>
+                                    {msgMenuId === m._id && (
+                                      <div className={`absolute top-full mt-1 w-28 bg-white rounded-xl neo-menu border py-1 text-sm shadow ${isMe ? "right-0" : "left-0"}`}>
+                                        {isMe && (
+                                          <button
+                                            onClick={() => {
+                                              setMsgMenuId(null);
+                                              startEdit(m);
+                                            }}
+                                            className="w-full flex items-center gap-2 text-left px-3 py-1.5 hover:bg-slate-50"
+                                          >
+                                            <FiEdit2 size={13} /> Edit
+                                          </button>
+                                        )}
+                                        <button
+                                          onClick={() => {
+                                            setMsgMenuId(null);
+                                            removeMessage(m._id);
+                                          }}
+                                          className="w-full flex items-center gap-2 text-left px-3 py-1.5 text-red-600 hover:bg-red-50"
+                                        >
+                                          <FiTrash2 size={13} /> Delete
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+
                                 {/* FB-style floating reaction picker */}
                                 {reactPickerFor === m._id && (
                                   <div
                                     data-react-picker
-                                    className={`absolute bottom-full z-40 mb-1 flex items-end gap-0.5 rounded-full bg-white border border-slate-100 shadow-[0_8px_30px_rgba(0,0,0,0.15)] px-2 py-1.5 ${
+                                    className={`absolute bottom-full z-40 mb-1 flex items-end gap-0.5 rounded-full bg-white border border-slate-100 shadow-[0_8px_30px_rgba(0,0,0,0.15)] px-2 py-1.5 max-sm:scale-90 origin-bottom ${
                                       isMe ? "right-0" : "left-0"
                                     }`}
                                   >
                                     {MSG_REACTIONS.map((r, i) => (
                                       <button
                                         key={r.key}
-                                        onPointerDown={(e) => e.stopPropagation()}
-                                        onClick={() => reactToMessage(m, r.key)}
+                                        /* react on press (Messenger-style) — works
+                                           100% on touch where trailing clicks get
+                                           swallowed after a long-press */
+                                        onPointerDown={(e) => {
+                                          e.stopPropagation();
+                                          e.preventDefault();
+                                          reactToMessage(m, r.key);
+                                        }}
                                         title={r.label}
                                         className="group/emoji relative p-0.5 emoji-pop"
                                         style={{ animationDelay: `${i * 45}ms` }}
@@ -1746,46 +1897,6 @@ export default function Chat() {
                                 )}
                               </div>
                             </div>
-                            {/* 3-dot menu — absolutely placed so it adds ZERO gap to the bubble */}
-                            {(isMe || isAdmin) && (
-                              <div
-                                data-msg-menu
-                                className={`absolute top-0 ${isMe ? "right-full mr-1" : "left-full ml-1"} z-30`}
-                              >
-                                <button
-                                  onClick={() => setMsgMenuId(msgMenuId === m._id ? null : m._id)}
-                                  title="Message options"
-                                  aria-label="Message options"
-                                  className="p-1 rounded-full bg-white/90 border border-slate-200 text-slate-500 hover:text-slate-800 shadow-sm opacity-0 group-hover/msg:opacity-100 focus:opacity-100 max-sm:opacity-70 transition"
-                                >
-                                  <FiMoreVertical size={13} />
-                                </button>
-                                {msgMenuId === m._id && (
-                                  <div className={`absolute top-full mt-1 w-28 bg-white rounded-xl neo-menu border py-1 text-sm shadow ${isMe ? "right-0" : "left-0"}`}>
-                                    {isMe && (
-                                      <button
-                                        onClick={() => {
-                                          setMsgMenuId(null);
-                                          startEdit(m);
-                                        }}
-                                        className="w-full flex items-center gap-2 text-left px-3 py-1.5 hover:bg-slate-50"
-                                      >
-                                        <FiEdit2 size={13} /> Edit
-                                      </button>
-                                    )}
-                                    <button
-                                      onClick={() => {
-                                        setMsgMenuId(null);
-                                        removeMessage(m._id);
-                                      }}
-                                      className="w-full flex items-center gap-2 text-left px-3 py-1.5 text-red-600 hover:bg-red-50"
-                                    >
-                                      <FiTrash2 size={13} /> Delete
-                                    </button>
-                                  </div>
-                                )}
-                              </div>
-                            )}
                           </div>
                         ),
                       )}

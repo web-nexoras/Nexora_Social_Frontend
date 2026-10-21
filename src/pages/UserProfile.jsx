@@ -5,7 +5,6 @@ import { usersApi } from "../api/usersApi";
 import { friendsApi } from "../api/friendsApi";
 import { followsApi } from "../api/followsApi";
 import { useToast } from "../context/ToastContext";
-import InlineLoader from "../components/InlineLoader";
 import Skeleton from "../components/Skeleton";
 
 export default function UserProfile() {

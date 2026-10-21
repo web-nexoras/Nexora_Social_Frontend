@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { storiesApi } from "../api/storiesApi";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
+import Skeleton from "../components/Skeleton";
 import { FiPlus, FiImage } from "react-icons/fi";
 
 export default function Stories() {
@@ -91,7 +92,11 @@ export default function Stories() {
           );
         })}
       </div>
-      {loading && <p className="text-slate-500">Loading...</p>}
+      {loading && (
+        <div className="flex gap-4 overflow-hidden pb-4">
+          <Skeleton className="shrink-0 w-28 h-44 rounded-2xl" count={4} />
+        </div>
+      )}
       {!loading && stories.length === 0 && <p className="text-slate-500">No stories yet.</p>}
     </div>
   );

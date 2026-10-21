@@ -3,7 +3,6 @@ import { FiCheck } from "react-icons/fi";
 import { Link, useNavigate } from "react-router-dom";
 import { groupsApi } from "../api/groupsApi";
 import { useAuth } from "../context/AuthContext";
-import InlineLoader from "../components/InlineLoader";
 import Skeleton from "../components/Skeleton";
 
 export default function Groups() {

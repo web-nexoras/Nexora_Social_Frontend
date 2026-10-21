@@ -7,7 +7,6 @@ import { ToastProvider } from "./context/ToastContext";
 import PublicLayout from "./components/PublicLayout";
 import DashboardShell from "./components/DashboardShell";
 import ProtectedRoute from "./components/ProtectedRoute";
-import InlineLoader from "./components/InlineLoader";
 import Skeleton from "./components/Skeleton";
 
 const Home = lazy(() => import("./pages/Home"));
