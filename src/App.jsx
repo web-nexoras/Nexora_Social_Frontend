@@ -8,6 +8,7 @@ import PublicLayout from "./components/PublicLayout";
 import DashboardShell from "./components/DashboardShell";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Skeleton from "./components/Skeleton";
+import OAuthCallbackGate from "./components/OAuthCallbackGate";
 
 const Home = lazy(() => import("./pages/Home"));
 const Login = lazy(() => import("./pages/Login"));
@@ -75,6 +76,7 @@ export default function App() {
         <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <SocketProvider>
             <ToastProvider>
+              <OAuthCallbackGate />
               <RouteErrorBoundary>
                 <Suspense
                   fallback={

@@ -1,5 +1,6 @@
 import axios from "axios";
 import { getAuthToken, setAuthToken, clearAuthToken } from "../utils/authToken";
+import { auth0CallbackOnLoad } from "../utils/auth0Callback";
 import { API_BASE_URL } from "./config";
 
 const api = axios.create({
@@ -34,13 +35,16 @@ api.interceptors.response.use(
     const original = error.config;
     const status = error?.response?.status;
 
-    // Only attempt refresh for 401s, and never for the refresh endpoint itself.
+    // Only attempt refresh for 401s, and never for auth endpoints that issue
+    // the session itself (a failed OAuth exchange must not trigger a reload).
+    const url = String(original?.url || "");
     if (
       status === 401 &&
       original &&
       !original._retry &&
-      !String(original.url || "").includes("/auth/refresh-token") &&
-      !String(original.url || "").includes("/auth/signin")
+      !url.includes("/auth/refresh-token") &&
+      !url.includes("/auth/signin") &&
+      !url.includes("/auth/oauth")
     ) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
@@ -65,8 +69,13 @@ api.interceptors.response.use(
       } catch (refreshError) {
         processQueue(refreshError, null);
         clearAuthToken();
-        // Redirect to sign-in on refresh failure
-        if (typeof window !== "undefined" && !window.location.pathname.includes("/signin")) {
+        // Redirect to sign-in on refresh failure. Skip this during an Auth0
+        // callback: a full reload would throw away the in-flight login result.
+        if (
+          !auth0CallbackOnLoad &&
+          typeof window !== "undefined" &&
+          !window.location.pathname.includes("/signin")
+        ) {
           window.location.href = "/signin";
         }
         return Promise.reject(refreshError);

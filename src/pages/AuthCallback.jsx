@@ -4,6 +4,12 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import AuthShell from "../components/AuthShell";
+import { isAuth0Configured } from "../utils/auth0Config";
+import { readAuth0UrlError } from "../utils/auth0Callback";
+import { describeAuth0UrlError, describeOAuthFailure } from "../utils/oauthErrors";
+
+const PENDING_MESSAGE =
+  "Your account is awaiting admin approval. You can sign in once an administrator approves it.";
 
 export default function AuthCallback() {
   const { isAuthenticated, getIdTokenClaims, isLoading, error } = useAuth0();
@@ -11,38 +17,68 @@ export default function AuthCallback() {
   const { showToast } = useToast();
   const navigate = useNavigate();
   const [status, setStatus] = useState("Signing you in...");
-  const oauthExchange = useRef(null);
+  const exchange = useRef(null);
+  const reported = useRef(false);
+  const finished = useRef(false);
 
   useEffect(() => {
-    const auth0Configured = Boolean(
-      import.meta.env.VITE_AUTH0_DOMAIN?.trim() && import.meta.env.VITE_AUTH0_CLIENT_ID?.trim(),
-    );
-    if (!auth0Configured) {
+    if (!isAuth0Configured) {
       navigate("/signin", { replace: true });
       return;
+    }
+
+    // Auth0 puts failures in the URL (error / error_description) instead of a
+    // code. Explain them instead of spinning forever.
+    const urlError = readAuth0UrlError();
+    if (urlError) {
+      const message = describeAuth0UrlError(urlError.error, urlError.description);
+      if (!reported.current) {
+        reported.current = true;
+        setStatus(message);
+        showToast(message, "error", 8000);
+      }
+      const timer = setTimeout(
+        () => navigate("/signin", { replace: true, state: { oauthError: message } }),
+        3500,
+      );
+      return () => clearTimeout(timer);
     }
 
     if (isLoading) return;
 
     if (error) {
-      setStatus("Auth0 error: " + error.message);
-      showToast("Auth0 login failed: " + error.message, "error");
-      const t = setTimeout(() => navigate("/signin"), 3000);
-      return () => clearTimeout(t);
+      const message = describeAuth0UrlError(
+        error.error || error.name,
+        error.error_description || error.message,
+      );
+      setStatus(message);
+      if (!reported.current) {
+        reported.current = true;
+        showToast(message, "error", 8000);
+      }
+      const timer = setTimeout(
+        () => navigate("/signin", { replace: true, state: { oauthError: message } }),
+        3500,
+      );
+      return () => clearTimeout(timer);
     }
 
     if (!isAuthenticated) {
-      // Not authenticated and not loading — redirect to login
       navigate("/signin", { replace: true });
       return;
     }
 
+    if (finished.current) return;
+    finished.current = true;
+
     let cancelled = false;
+    let timer;
+
     (async () => {
       try {
         // Reuse the same exchange across React StrictMode's development effect replay.
-        if (!oauthExchange.current) {
-          oauthExchange.current = (async () => {
+        if (!exchange.current) {
+          exchange.current = (async () => {
             const claims = await getIdTokenClaims();
             const idToken = claims?.__raw;
             if (!idToken) throw new Error("No ID token received from Auth0");
@@ -50,32 +86,41 @@ export default function AuthCallback() {
           })();
         }
 
-        const data = await oauthExchange.current;
+        const data = await exchange.current;
         if (cancelled) return;
 
         if (data?.pending) {
-          setStatus("Account created. Pending admin approval.");
-          showToast("Account created. Pending admin approval.", "info", 6000);
-          setTimeout(() => navigate("/signin"), 3000);
+          setStatus(PENDING_MESSAGE);
+          showToast(PENDING_MESSAGE, "info", 8000);
+          timer = setTimeout(
+            () =>
+              navigate("/signin", {
+                replace: true,
+                state: { oauthError: PENDING_MESSAGE, oauthPending: true },
+              }),
+            3000,
+          );
         } else {
           showToast("Signed in successfully! Welcome back.", "success");
-          navigate("/feed");
+          navigate("/feed", { replace: true });
         }
       } catch (err) {
         if (cancelled) return;
-        const msg = err?.response?.data?.message ||
-          (err?.code === "ERR_NETWORK" || !err?.response
-            ? "Could not connect to the server. Check your connection and try again."
-            : "OAuth login failed. Try again.");
-        const isPending = err?.response?.data?.pending;
-        setStatus(msg);
-        showToast(msg, isPending ? "info" : "error", 6000);
-        setTimeout(() => navigate("/signin"), 3000);
+        const { message, tone } = describeOAuthFailure(err);
+        setStatus(message);
+        showToast(message, tone, 8000);
+        timer = setTimeout(
+          () => navigate("/signin", { replace: true, state: { oauthError: message } }),
+          3500,
+        );
       }
     })();
 
-    return () => { cancelled = true; };
-  }, [isAuthenticated, isLoading, error]);
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [isAuthenticated, isLoading, error, getIdTokenClaims, navigate, oauthLogin, showToast]);
 
   return (
     <AuthShell title="Signing in..." subtitle={status}>

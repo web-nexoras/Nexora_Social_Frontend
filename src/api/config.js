@@ -1,5 +1,8 @@
+// The backend URL comes from VITE_API_URL. The localhost fallback is used only
+// in development; production builds never silently fall back to localhost.
 const configuredApiUrl =
-  import.meta.env.VITE_API_URL || "http://localhost:5000/api/v1";
+  (import.meta.env.VITE_API_URL || "").trim() ||
+  (import.meta.env.DEV ? "http://localhost:5000/api/v1" : "/api/v1");
 
 const isLoopback = (hostname) =>
   ["localhost", "127.0.0.1", "::1"].includes(hostname.toLowerCase());

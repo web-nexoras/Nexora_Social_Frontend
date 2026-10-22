@@ -1,19 +1,19 @@
-import React, { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useAuth0 } from "@auth0/auth0-react";
 import { useToast } from "../context/ToastContext";
 import AuthShell from "../components/AuthShell";
 import PasswordInput from "../components/PasswordInput";
+import { isAuth0Configured } from "../utils/auth0Config";
 
 export default function Login() {
   const { login } = useAuth();
   const { loginWithRedirect, isLoading: auth0Loading } = useAuth0();
-  const auth0Configured = Boolean(
-    import.meta.env.VITE_AUTH0_DOMAIN?.trim() && import.meta.env.VITE_AUTH0_CLIENT_ID?.trim(),
-  );
+  const auth0Configured = isAuth0Configured;
   const { showToast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -21,6 +21,16 @@ export default function Login() {
   const [generalError, setGeneralError] = useState("");
   const [loading, setLoading] = useState(false);
   const [socialLoading, setSocialLoading] = useState(false);
+
+  // Show the reason OAuth could not finish (pending approval, cancelled,
+  // callback mismatch...) and clear it from history so a refresh hides it.
+  useEffect(() => {
+    const incoming = location.state?.oauthError;
+    if (!incoming) return;
+    setGeneralError(incoming);
+    navigate(location.pathname, { replace: true, state: null });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const validate = () => {
     const errors = {};
@@ -172,7 +182,7 @@ export default function Login() {
           {loading ? "Signing in..." : "Sign In"}
         </button>
 
-        <div className="hidden lg:block">
+        <div className="mt-2">
           <div className="flex justify-center text-xs my-2">
             <span className="text-slate-400">or continue with</span>
           </div>

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import { authApi } from "../api/authApi";
 import { clearAuthToken, setAuthToken } from "../utils/authToken";
 
@@ -7,6 +7,9 @@ const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  // A social login can finish while the initial session check is still in
+  // flight. Never let that older response wipe the freshly signed-in user.
+  const loginApplied = useRef(false);
 
   // Load current user on app start
   useEffect(() => {
@@ -14,11 +17,13 @@ export function AuthProvider({ children }) {
       try {
         // Always check the session so httpOnly-cookie sessions survive refreshes.
         const res = await authApi.getProfile();
-        setUser(res.data?.user || res.data);
+        if (!loginApplied.current) setUser(res.data?.user || res.data);
       } catch (error) {
-        setUser(null);
-        // A temporary network/server failure must not erase a still-valid token.
-        if ([401, 403].includes(error?.response?.status)) clearAuthToken();
+        if (!loginApplied.current) {
+          setUser(null);
+          // A temporary network/server failure must not erase a still-valid token.
+          if ([401, 403].includes(error?.response?.status)) clearAuthToken();
+        }
       } finally {
         setLoading(false);
       }
@@ -30,6 +35,7 @@ export function AuthProvider({ children }) {
     const res = await authApi.signin(email, password);
     const token = res.data?.accessToken;
     setAuthToken(token);
+    loginApplied.current = true;
     if (res.data?.user) {
       setUser(res.data.user);
       return res.data;
@@ -53,6 +59,7 @@ export function AuthProvider({ children }) {
     const res = await authApi.oauthAuth0(idToken);
     const token = res.data?.accessToken;
     setAuthToken(token);
+    loginApplied.current = true;
     if (res.data?.user) {
       setUser(res.data.user);
     } else {
