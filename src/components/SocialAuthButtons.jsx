@@ -30,7 +30,18 @@ const BUTTON_CLASS =
   "flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-semibold hover:bg-slate-50 transition disabled:opacity-60 disabled:cursor-not-allowed";
 
 export default function SocialAuthButtons({ onError, disabled = false }) {
-  const { loginWithRedirect, isLoading } = useAuth0();
+  // `useAuth0()` throws when no real Auth0Provider is mounted (Auth0 not
+  // configured on this deployment). Guard the call so Sign In / Sign Up still
+  // render the email+password form instead of crashing the whole page.
+  let auth0 = null;
+  try {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    auth0 = useAuth0();
+  } catch {
+    auth0 = null;
+  }
+  const loginWithRedirect = auth0?.loginWithRedirect;
+  const isLoading = auth0?.isLoading ?? false;
   const { showToast } = useToast();
   const [pendingConnection, setPendingConnection] = useState(null);
 
@@ -42,7 +53,7 @@ export default function SocialAuthButtons({ onError, disabled = false }) {
   const startSocialLogin = async (connection) => {
     onError?.("");
 
-    if (!isAuth0Configured) {
+    if (!isAuth0Configured || typeof loginWithRedirect !== "function") {
       reportError(
         "Social sign-in is not configured for this app. Add VITE_AUTH0_DOMAIN and VITE_AUTH0_CLIENT_ID, then restart or redeploy.",
       );

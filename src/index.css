@@ -145,10 +145,36 @@ select:not(.neo-input):focus {
 .dark .bg-slate-200 { background-color: #2e343d; }
 .dark .bg-slate-300 { background-color: #3a414b; }
 
-/* Borders */
+/* Borders — every side, so bare `border-t` / `border-b` / `border-l` / `border-r`
+   (which have no colour class of their own) never inherit the light text colour. */
 .dark .border,
+.dark .border-t,
+.dark .border-b,
+.dark .border-l,
+.dark .border-r,
+.dark .border-x,
+.dark .border-y,
 .dark .border-slate-200,
-.dark .border-slate-100 { border-color: var(--neo-border); }
+.dark .border-slate-100,
+.dark .border-slate-300,
+.dark .border-gray-200,
+.dark .border-gray-100,
+.dark .border-neutral-200 { border-color: var(--neo-border); }
+
+/* Vertical rhythm dividers (`divide-y` / `divide-x`) */
+.dark .divide-y > :not([hidden]) ~ :not([hidden]),
+.dark .divide-x > :not([hidden]) ~ :not([hidden]) { border-color: var(--neo-border); }
+
+/* Solids that were pure white in light mode — soften them on dark surfaces so
+   avatar rings / dot badges read as a subtle grey edge instead of glare. */
+.dark .border-white { border-color: #3b4250; }
+.dark .border-white\/80 { border-color: rgba(255, 255, 255, 0.4); }
+.dark .border-white\/70 { border-color: rgba(255, 255, 255, 0.35); }
+.dark .border-white\/40 { border-color: rgba(255, 255, 255, 0.22); }
+.dark .border-white\/25 { border-color: rgba(255, 255, 255, 0.18); }
+.dark .border-white\/20 { border-color: rgba(255, 255, 255, 0.16); }
+.dark .border-white\/15 { border-color: rgba(255, 255, 255, 0.14); }
+.dark .border-white\/10 { border-color: rgba(255, 255, 255, 0.1); }
 
 /* Hover states */
 .dark .hover\:bg-slate-50:hover { background-color: #262b33; }

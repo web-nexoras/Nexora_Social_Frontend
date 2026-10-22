@@ -76,20 +76,36 @@ const msgPreview = (m) => {
 
 // Force every mic track through the strongest noise-cleaning pipeline the
 // browser offers: noise suppression, echo cancellation, auto gain + voice
-// isolation (Chrome/Edge). applyConstraints re-applies after the device
-// gives us the track — some mics drop the flags from the initial request.
+// isolation (Chrome/Edge). applyConstraints re-applies after the device gives
+// us the track — some mics drop the flags from the initial request.
+// `voiceIsolation` is not understood by every browser, so it is applied in a
+// second pass: if the combined call rejects, the universal flags are retried on
+// their own instead of all being silently dropped.
 const primeAudioTrack = (track) => {
+  const base = {
+    noiseSuppression: true,
+    echoCancellation: true,
+    autoGainControl: true,
+  };
   try {
-    track
-      .applyConstraints({
-        noiseSuppression: true,
-        echoCancellation: true,
-        autoGainControl: true,
-        voiceIsolation: true,
-      })
-      .catch(() => {});
+    const attempt = track.applyConstraints({ ...base, voiceIsolation: true });
+    if (attempt && typeof attempt.catch === "function") {
+      attempt.catch(() => {
+        // Chrome/Edge understand these; Safari/Firefox may not know
+        // voiceIsolation — retry without it so the core cleanup still applies.
+        try {
+          track.applyConstraints(base).catch(() => {});
+        } catch {
+          /* keep whatever the browser gave us */
+        }
+      });
+    }
   } catch {
-    /* older browsers — default processing stays on */
+    try {
+      track.applyConstraints(base).catch(() => {});
+    } catch {
+      /* older browsers — default processing stays on */
+    }
   }
 };
 
@@ -140,33 +156,42 @@ const buildVoiceStream = async (rawStream, options = {}) => {
     const gate = ctx.createGain();
     gate.gain.value = 1;
 
-    // Measure the level with an analyser; the audio itself flows straight
-    // through gate → destination (a ScriptProcessor would swallow the signal
-    // and produce a silent recording).
+    // Level detection is SIDE-CHAINED: the analyser is a leaf (it never sits in
+    // the audio path) so the recorded audio is always a clean, full-bandwidth
+    // copy of the filtered mic. An AnalyserNode in series would still pass
+    // audio, but keeping it out avoids any chance of downstream processing.
     const analyser = ctx.createAnalyser();
-    analyser.fftSize = 512;
+    analyser.fftSize = 1024;
+    analyser.smoothingTimeConstant = 0;
     const levels = new Float32Array(analyser.fftSize);
 
     const destination = ctx.createMediaStreamDestination();
     source.connect(highpass);
     highpass.connect(lowpass);
     lowpass.connect(compressor);
-    compressor.connect(analyser);
-    analyser.connect(gate);
+    compressor.connect(gate); // audio path: mic -> filters -> compressor -> gate -> out
     gate.connect(destination);
+    compressor.connect(analyser); // side chain: tap only, not in the audio path
 
-    // Speaking level opens the gate instantly; silence fades it out so
-    // background chatter never reaches the recording.
+    // Speaking level opens the gate instantly; silence fades it out. 20 ms
+    // keeps fast enough that no syllable start is clipped, while the 0.12 s
+    // release stops the tail of a word from being chopped off.
     const gateTimer = setInterval(() => {
       analyser.getFloatTimeDomainData(levels);
       let peak = 0;
+      let sumSq = 0;
       for (let i = 0; i < levels.length; i += 1) {
-        const v = Math.abs(levels[i]);
-        if (v > peak) peak = v;
+        const v = levels[i];
+        const a = Math.abs(v);
+        if (a > peak) peak = a;
+        sumSq += v * v;
       }
-      const speaking = peak > threshold;
-      gate.gain.setTargetAtTime(speaking ? 1 : silentGain, ctx.currentTime, speaking ? 0.01 : 0.12);
-    }, 50);
+      const rms = Math.sqrt(sumSq / levels.length);
+      // Open on either a strong transient (peak) or sustained speech (rms), so
+      // soft-spoken voices register instead of being gated into silence.
+      const speaking = peak > threshold || rms > threshold * 0.5;
+      gate.gain.setTargetAtTime(speaking ? 1 : silentGain, ctx.currentTime, speaking ? 0.008 : 0.12);
+    }, 20);
 
     return {
       stream: destination.stream,
@@ -318,7 +343,10 @@ export default function Chat() {
   // hears is only the voice, so calls sound clean and professional.
   const prepareCallMedia = async (rawStream) => {
     rawStream.getAudioTracks().forEach(primeAudioTrack);
-    const cleaned = await buildVoiceStream(rawStream, { silentGain: 0.02, threshold: 0.018 });
+    // Live calls: a little more gate headroom than voice notes so room noise
+    // never reaches the other side, while the peak-OR-rms detection keeps even
+    // soft-spoken voices audible.
+    const cleaned = await buildVoiceStream(rawStream, { silentGain: 0.04, threshold: 0.035 });
     const sendStream = new MediaStream([
       ...cleaned.stream.getAudioTracks(),
       ...rawStream.getVideoTracks(),

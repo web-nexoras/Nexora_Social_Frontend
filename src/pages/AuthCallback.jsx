@@ -12,7 +12,17 @@ const PENDING_MESSAGE =
   "Your account is awaiting admin approval. You can sign in once an administrator approves it.";
 
 export default function AuthCallback() {
-  const { isAuthenticated, getIdTokenClaims, isLoading, error } = useAuth0();
+  let auth0 = null;
+  try {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    auth0 = useAuth0();
+  } catch {
+    auth0 = null;
+  }
+  const isAuthenticated = auth0?.isAuthenticated ?? false;
+  const isLoading = auth0?.isLoading ?? false;
+  const error = auth0?.error ?? null;
+  const getIdTokenClaims = auth0?.getIdTokenClaims;
   const { oauthLogin } = useAuth();
   const { showToast } = useToast();
   const navigate = useNavigate();
@@ -73,6 +83,12 @@ export default function AuthCallback() {
 
     let cancelled = false;
     let timer;
+
+    // Auth0 provider is not mounted — there is nothing to exchange here.
+    if (typeof getIdTokenClaims !== "function") {
+      navigate("/signin", { replace: true });
+      return;
+    }
 
     (async () => {
       try {

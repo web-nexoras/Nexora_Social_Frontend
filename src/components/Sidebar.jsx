@@ -33,7 +33,7 @@ export default function Sidebar({ onNavigate }) {
   return (
     <aside className="neo-raised app-sidebar p-4 flex-1 min-h-0 overflow-y-auto flex flex-col" onClick={onNavigate}>
       <div className="mb-6">
-        <h2 className="text-lg font-extrabold text-black">{user?.role === "admin" ? "Nexora Social Admin" : "Nexora Social"}</h2>
+        <h2 className="text-lg font-extrabold text-slate-900">{user?.role === "admin" ? "Nexora Social Admin" : "Nexora Social"}</h2>
         <p className="text-xs text-slate-400 mt-1">
           {user?.role === "admin" ? "Admin" : "User"}
         </p>
@@ -83,7 +83,7 @@ export default function Sidebar({ onNavigate }) {
 
       {/* Theme selector — pinned to the sidebar bottom and STICKY, so it
           stays visible on lg screens and inside the mobile drawer too */}
-      <div className="mt-auto sticky bottom-0 bg-inherit pt-4 pb-1 border-t shadow-[0_-6px_16px_rgba(15,23,42,0.06)]">
+      <div className="mt-auto sticky bottom-0 bg-inherit pt-4 pb-1">
         <p className="text-xs text-slate-400 mb-2">Appearance</p>
         <div className="flex gap-2">
           <button

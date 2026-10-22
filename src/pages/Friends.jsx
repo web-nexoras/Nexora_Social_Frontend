@@ -21,25 +21,34 @@ export default function Friends() {
   const loadAll = async () => {
     const sequence = ++loadSequence.current;
     setLoading(true);
-    try {
-      const [s, i, f, se] = await Promise.all([
-        friendsApi.suggestions(searchQuery),
-        friendsApi.incoming(),
-        friendsApi.list(),
-        friendsApi.sent(),
-      ]);
-      if (sequence !== loadSequence.current) return;
-      setSuggestions(s.data?.users || []);
-      setIncoming(i.data?.requests || []);
-      setFriends(f.data?.friends || []);
-      setSent(se.data?.requests || []);
-    } catch (e) {
-      if (sequence !== loadSequence.current) return;
-      console.error(e);
-      showToast(e?.response?.data?.message || "Could not load friends", "error");
-    } finally {
-      if (sequence === loadSequence.current) setLoading(false);
+    // allSettled: a single failing tab (e.g. no suggestions) must not wipe out
+    // the friends/requests lists that loaded fine.
+    const results = await Promise.allSettled([
+      friendsApi.suggestions(searchQuery),
+      friendsApi.incoming(),
+      friendsApi.list(),
+      friendsApi.sent(),
+    ]);
+    if (sequence !== loadSequence.current) return;
+
+    const val = (idx, fallback) =>
+      results[idx].status === "fulfilled" ? results[idx].value : fallback;
+    const asArray = (v) => (Array.isArray(v) ? v : []);
+
+    const s = val(0, {});
+    const i = val(1, {});
+    const f = val(2, {});
+    const se = val(3, {});
+
+    setSuggestions(asArray(s.data?.users));
+    setIncoming(asArray(i.data?.requests));
+    setFriends(asArray(f.data?.friends));
+    setSent(asArray(se.data?.requests));
+
+    if (results.every((r) => r.status === "rejected")) {
+      showToast("Could not load friends", "error");
     }
+    setLoading(false);
   };
 
   useEffect(() => {

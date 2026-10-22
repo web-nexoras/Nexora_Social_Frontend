@@ -14,7 +14,22 @@ const PENDING_MESSAGE =
 // lands on "/" instead of a dedicated callback page. This gate finishes the
 // sign-in from any page, exactly once per page load.
 export default function OAuthCallbackGate() {
-  const { isAuthenticated, isLoading, error, getIdTokenClaims } = useAuth0();
+  // `useAuth0()` throws when no provider is mounted (Auth0 not configured on
+  // this deployment). This gate renders above the error boundary, so a throw
+  // here would white-screen the whole app — guard it.
+  let auth0 = null;
+  try {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    auth0 = useAuth0();
+  } catch {
+    auth0 = null;
+  }
+
+  const isAuthenticated = auth0?.isAuthenticated ?? false;
+  const isLoading = auth0?.isLoading ?? false;
+  const error = auth0?.error ?? null;
+  const getIdTokenClaims = auth0?.getIdTokenClaims;
+
   const { oauthLogin } = useAuth();
   const { showToast } = useToast();
   const navigate = useNavigate();
@@ -23,6 +38,8 @@ export default function OAuthCallbackGate() {
 
   useEffect(() => {
     if (!isAuth0Configured || !auth0CallbackOnLoad) return;
+    // Auth0 is not configured: nothing can finish the exchange here.
+    if (typeof getIdTokenClaims !== "function") return;
     // The dedicated /auth/callback page handles its own exchange.
     if (pathname.startsWith("/auth/callback")) return;
     if (handled.current) return;

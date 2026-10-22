@@ -6,6 +6,12 @@ export default {
       fontFamily: {
         sans: ["Inter", "system-ui", "Segoe UI", "Arial", "sans-serif"],
       },
+      // Bare `border` / `border-t` utilities would otherwise fall back to
+      // `currentColor` and pick up the near-white text colour in dark mode.
+      // A neutral grey default keeps dividers looking like dividers.
+      borderColor: {
+        DEFAULT: "#d7dce4",
+      },
       colors: {
         // Monochrome theme — black & white (no blue)
         brand: "#1e293b",

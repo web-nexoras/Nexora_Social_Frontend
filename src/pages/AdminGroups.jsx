@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
 import { groupsApi } from "../api/groupsApi";
 import { usersApi } from "../api/usersApi";
+import Skeleton from "../components/Skeleton";
 
 export default function AdminGroups() {
   const [groups, setGroups] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [members, setMembers] = useState([]);
   const [subscribers, setSubscribers] = useState([]);
@@ -16,11 +18,16 @@ export default function AdminGroups() {
   const subscribersRequest = useRef(0);
 
   const load = async () => {
+    setLoading(true);
     try {
       const res = await groupsApi.list();
-      setGroups(res.data.groups || []);
+      // Guard against a non-array payload so `.map` below can never crash.
+      setGroups(Array.isArray(res.data?.groups) ? res.data.groups : []);
     } catch (e) {
       setMsg(e?.response?.data?.message || "Could not load groups");
+      setGroups([]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -155,7 +162,15 @@ export default function AdminGroups() {
       </div>
 
       <div className="space-y-4">
-        {groups.map((g) => (
+        {loading && (
+          <div className="space-y-4">
+            <Skeleton className="h-28 w-full rounded-2xl" count={3} />
+          </div>
+        )}
+        {!loading && groups.length === 0 && (
+          <p className="text-sm text-slate-500">No groups yet.</p>
+        )}
+        {!loading && groups.map((g) => (
           <div key={g._id} className="bg-white rounded-2xl shadow p-5">
             <div className="flex items-center justify-between mb-3">
               <div>

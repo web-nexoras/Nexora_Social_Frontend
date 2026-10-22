@@ -6,6 +6,7 @@ import { friendsApi } from "../api/friendsApi";
 import { usersApi } from "../api/usersApi";
 import { useToast } from "../context/ToastContext";
 import { FiArrowRight, FiCheck, FiX, FiUserPlus, FiEdit2 } from "react-icons/fi";
+import Skeleton from "../components/Skeleton";
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -22,6 +23,7 @@ export default function Dashboard() {
   });
   const [allUsers, setAllUsers] = useState([]);  const [incoming, setIncoming] = useState([]);
   const [suggestions, setSuggestions] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   // Admin: quick "add user" modal (creates an approved account instantly)
   const [showAddUser, setShowAddUser] = useState(false);
@@ -93,43 +95,57 @@ export default function Dashboard() {
   useEffect(() => {
     let alive = true;
     const load = async () => {
-      try {
-        const [f, c, g, inc, u, s] = await Promise.all([
-          api.get("/friends"),
-          api.get("/chat/conversations"),
-          api.get("/groups"),
-          api.get("/friends/requests/incoming"),
-          isAdmin
-            ? usersApi.list({ limit: 100 })
-            : Promise.resolve({ data: { users: [], total: 0 } }),
-          friendsApi.suggestions(),
-        ]);
-        if (!alive) return;
-        setStats({
-          friends: (f.data?.friends || []).length,
-          conversations: (c.data?.conversations || []).length,
-          groups: (g.data?.groups || []).length,
-          pendingRequests: (inc.data?.requests || []).length,
-          totalUsers: u.data?.total || (u.data?.users || []).length,
-          pendingApprovals: (u.data?.users || []).filter((x) => {
-            const status = x.status || (x.isApproved ? "approved" : "pending");
-            return status === "pending";
-          }).length,
-        });
-        setIncoming(inc.data?.requests || []);
-        setSuggestions(s.data?.users || []);
-        if (isAdmin) setAllUsers(u.data?.users || []);
-      } catch (e) {
-        if (!alive) return;
-        console.error(e);
-        showToast(e?.response?.data?.message || "Could not load dashboard data", "error");
+      setLoading(true);
+      // allSettled (not all): one failing endpoint must not blank the whole
+      // dashboard — each section keeps whatever data did load.
+      const results = await Promise.allSettled([
+        api.get("/friends"),
+        api.get("/chat/conversations"),
+        api.get("/groups"),
+        api.get("/friends/requests/incoming"),
+        isAdmin
+          ? usersApi.list({ limit: 100 })
+          : Promise.resolve({ data: { users: [], total: 0 } }),
+        friendsApi.suggestions(),
+      ]);
+      if (!alive) return;
+
+      const val = (i, fallback) =>
+        results[i].status === "fulfilled" ? results[i].value : fallback;
+      const f = val(0, {});
+      const c = val(1, {});
+      const g = val(2, {});
+      const inc = val(3, {});
+      const u = val(4, {});
+      const s = val(5, {});
+
+      const asArray = (v) => (Array.isArray(v) ? v : []);
+
+      setStats({
+        friends: asArray(f.data?.friends).length,
+        conversations: asArray(c.data?.conversations).length,
+        groups: asArray(g.data?.groups).length,
+        pendingRequests: asArray(inc.data?.requests).length,
+        totalUsers: u.data?.total || asArray(u.data?.users).length,
+        pendingApprovals: asArray(u.data?.users).filter((x) => {
+          const status = x.status || (x.isApproved ? "approved" : "pending");
+          return status === "pending";
+        }).length,
+      });
+      setIncoming(asArray(inc.data?.requests));
+      setSuggestions(asArray(s.data?.users));
+      if (isAdmin) setAllUsers(asArray(u.data?.users));
+
+      if (results.every((r) => r.status === "rejected")) {
+        showToast("Could not load dashboard data", "error");
       }
+      setLoading(false);
     };
     load();
     return () => {
       alive = false;
     };
-  }, [isAdmin]);
+  }, [isAdmin, showToast]);
 
   const accept = async (id) => {
     try {
@@ -240,7 +256,14 @@ export default function Dashboard() {
       </div>
 
       {/* Stats */}
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {loading && !isAdmin && (
+        <div className="space-y-4">
+          <Skeleton className="h-24 w-full rounded-2xl" />
+          <Skeleton className="h-40 w-full rounded-2xl" count={2} />
+        </div>
+      )}
+
+      <div className={`grid sm:grid-cols-2 lg:grid-cols-4 gap-4 ${loading ? "opacity-60" : ""}`}>
         {cards.map((c) => (
           <Link
             key={c.label}
