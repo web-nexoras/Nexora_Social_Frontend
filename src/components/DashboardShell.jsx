@@ -1,17 +1,28 @@
-import React from "react";
+import React, { Suspense, useState } from "react";
 import { Outlet } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
 import AdminChatFab from "./AdminChatFab";
-import { useState } from "react";
+import PageLoader from "./PageLoader";
 
 export default function DashboardShell() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  // The Suspense boundary sits ABOVE the whole shell: while a lazy page chunk
+  // downloads, the sidebar / topbar / floating button are not mounted at all —
+  // only the full-screen skeleton is visible.
   return (
-    /* h-screen + overflow-hidden = ONLY the <main> scrolls. Sidebar and
-       Topbar keep their own fixed height so page scrolling can never
-       drag them out of view (was: min-h-screen let the whole page scroll). */
+    <Suspense fallback={<PageLoader />}>
+      <ShellInner sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
+    </Suspense>
+  );
+}
+
+/* h-screen + overflow-hidden = ONLY the <main> scrolls. Sidebar and
+   Topbar keep their own fixed height so page scrolling can never
+   drag them out of view (was: min-h-screen let the whole page scroll). */
+function ShellInner({ sidebarOpen, setSidebarOpen }) {
+  return (
     <div className="flex h-screen overflow-hidden neo-surface">
       {/* Mobile overlay */}
       {sidebarOpen && (

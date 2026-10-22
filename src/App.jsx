@@ -7,7 +7,7 @@ import { ToastProvider } from "./context/ToastContext";
 import PublicLayout from "./components/PublicLayout";
 import DashboardShell from "./components/DashboardShell";
 import ProtectedRoute from "./components/ProtectedRoute";
-import Skeleton from "./components/Skeleton";
+import PageLoader from "./components/PageLoader";
 import OAuthCallbackGate from "./components/OAuthCallbackGate";
 
 const Home = lazy(() => import("./pages/Home"));
@@ -78,17 +78,7 @@ export default function App() {
             <ToastProvider>
               <OAuthCallbackGate />
               <RouteErrorBoundary>
-                <Suspense
-                  fallback={
-                    <div className="min-h-screen flex items-center justify-center p-6">
-                      <div className="w-full max-w-md space-y-3">
-                        <Skeleton className="h-12 w-full" />
-                        <Skeleton className="h-12 w-5/6" />
-                        <Skeleton className="h-12 w-2/3" />
-                      </div>
-                    </div>
-                  }
-                >
+                <Suspense fallback={<PageLoader />}>
                   <Routes>
                     {/* Auth pages — clean, full screen, no navbar */}
                     <Route path="/signin" element={<Login />} />
