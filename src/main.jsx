@@ -13,6 +13,12 @@ const auth0Domain = (import.meta.env.VITE_AUTH0_DOMAIN || "")
   .replace(/^https?:\/\//i, "")
   .replace(/\/+$/, "");
 const auth0ClientId = (import.meta.env.VITE_AUTH0_CLIENT_ID || "").trim();
+// Audience must be a clean URL — Vercel env vars often get a pasted
+// trailing newline (%0A) which makes /authorize return 404.
+const auth0Audience = (import.meta.env.VITE_AUTH0_AUDIENCE || "").replace(
+  /\s+/g,
+  ""
+);
 const auth0Configured = Boolean(auth0Domain && auth0ClientId);
 const app = <App />;
 
@@ -24,7 +30,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
         clientId={auth0ClientId}
         authorizationParams={{
           redirect_uri: window.location.origin + "/auth/callback",
-          audience: import.meta.env.VITE_AUTH0_AUDIENCE,
+          ...(auth0Audience ? { audience: auth0Audience } : {}),
         }}
       >
         {app}
