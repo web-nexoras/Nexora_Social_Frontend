@@ -18,7 +18,11 @@ const SocketContext = createContext({
   dismissToast: () => {},
   goToChat: () => {},
   unreadMessages: 0,
+  unreadConversations: new Set(),
   clearUnreadMessages: () => {},
+  clearConversationUnread: () => {},
+  setUnreadConversations: () => {},
+  setActiveConversation: () => {},
 });
 
 const getSocketUserId = (payload) =>
@@ -47,6 +51,10 @@ export function SocketProvider({ children }) {
   const [lastSeenById, setLastSeenById] = useState({});
   const [toast, setToast] = useState(null);
   const [unreadMessages, setUnreadMessages] = useState(0);
+  // Conversation ids that have unread messages. Kept here (not inside the Chat
+  // page) so the highlight survives navigating away and back.
+  const [unreadConversations, setUnreadConversations] = useState(new Set());
+  const activeConversationRef = useRef(null);
   // True while the chat screen is mounted — lets other UI (e.g. the chat-with-admin
   // FAB) back off so it never overlaps an active conversation.
   const [chatOpen, setChatOpen] = useState(false);
@@ -305,6 +313,14 @@ export function SocketProvider({ children }) {
       const convId = getConversationId(msg);
       setToast({ convId, text: `New message from ${msg.sender?.fullname || "Someone"}` });
       setUnreadMessages((c) => c + 1);
+      if (convId && convId !== activeConversationRef.current) {
+        setUnreadConversations((prev) => {
+          if (prev.has(convId)) return prev;
+          const next = new Set(prev);
+          next.add(convId);
+          return next;
+        });
+      }
       if (toastTimer.current) clearTimeout(toastTimer.current);
       toastTimer.current = setTimeout(() => setToast(null), 4000);
     });
@@ -381,6 +397,21 @@ export function SocketProvider({ children }) {
     dismissToast();
   };
   const clearUnreadMessages = () => setUnreadMessages(0);
+  const clearConversationUnread = (conversationId) => {
+    if (!conversationId) return;
+    setUnreadConversations((prev) => {
+      if (!prev.has(conversationId)) return prev;
+      const next = new Set(prev);
+      next.delete(conversationId);
+      return next;
+    });
+  };
+  // Tracks which conversation is currently on screen so a message arriving in
+  // that exact chat is never flagged as unread.
+  const setActiveConversation = (conversationId) => {
+    activeConversationRef.current = conversationId || null;
+    if (conversationId) clearConversationUnread(conversationId);
+  };
 
   return (
     <SocketContext.Provider
@@ -395,6 +426,10 @@ export function SocketProvider({ children }) {
         goToChat,
         unreadMessages,
         clearUnreadMessages,
+        unreadConversations,
+        clearConversationUnread,
+        setUnreadConversations,
+        setActiveConversation,
         chatOpen,
         setChatOpen,
         incomingCall,

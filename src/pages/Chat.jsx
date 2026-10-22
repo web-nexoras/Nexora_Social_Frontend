@@ -97,9 +97,13 @@ const primeAudioTrack = (track) => {
 // speaker's voice: low rumble/hiss are filtered out, levels are evened out and
 // a soft noise gate mutes whatever is below speaking level (fan noise, TV,
 // people chatting in the background) instead of recording it.
-const buildVoiceStream = async (rawStream) => {
+const buildVoiceStream = async (rawStream, options = {}) => {
   const AudioCtx = window.AudioContext || window.webkitAudioContext;
   if (!AudioCtx || !rawStream) return { stream: rawStream, cleanup: () => {} };
+  // Voice notes use a gentle floor; live calls use a much lower one so the
+  // mic is effectively muted between words (stronger noise cancellation).
+  const silentGain = Number.isFinite(options.silentGain) ? options.silentGain : 0.08;
+  const threshold = Number.isFinite(options.threshold) ? options.threshold : 0.015;
   try {
     const ctx = new AudioCtx();
     if (ctx.state === "suspended") {
@@ -160,8 +164,8 @@ const buildVoiceStream = async (rawStream) => {
         const v = Math.abs(levels[i]);
         if (v > peak) peak = v;
       }
-      const speaking = peak > 0.015;
-      gate.gain.setTargetAtTime(speaking ? 1 : 0.08, ctx.currentTime, speaking ? 0.01 : 0.12);
+      const speaking = peak > threshold;
+      gate.gain.setTargetAtTime(speaking ? 1 : silentGain, ctx.currentTime, speaking ? 0.01 : 0.12);
     }, 50);
 
     return {
@@ -214,9 +218,9 @@ export default function Chat() {
   const pendingImageRef = useRef(null);
   const [loading, setLoading] = useState(false);
   const [mobileView, setMobileView] = useState("list");
-  // highlighted state removed to avoid temporary color/border on new messages
-  const [unreadIds, setUnreadIds] = useState(new Set());
-  const { socket, socketConnected, onlineIds, lastSeenById, clearUnreadMessages, setChatOpen, incomingCall, clearIncomingCall, callPendingAccept, setCallPendingAccept, startRing, stopRing, attachPeer, detachPeer, flushIce } = useSocket();
+  // Unread conversation highlight lives in SocketContext so it survives
+  // navigating away from /chat and coming back.
+  const { socket, socketConnected, onlineIds, lastSeenById, clearUnreadMessages, unreadConversations, clearConversationUnread, setUnreadConversations, setActiveConversation, setChatOpen, incomingCall, clearIncomingCall, callPendingAccept, setCallPendingAccept, startRing, stopRing, attachPeer, detachPeer, flushIce } = useSocket();
 
   // Mark chat as active while this screen is open — hides the chat-with-admin FAB
   // so it never pops up over an ongoing conversation.
@@ -281,6 +285,8 @@ export default function Chat() {
   const endScreenTimerRef = useRef(null);
   const pcRef = useRef(null);
   const localStreamRef = useRef(null);
+  const rawCallStreamRef = useRef(null); // untouched mic/camera stream (for hard stop)
+  const callCleanupRef = useRef(null); // closes the call audio DSP graph
   const remoteAudioRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const localVideoRef = useRef(null);
@@ -306,6 +312,19 @@ export default function Chat() {
   useEffect(() => {
     callPhaseRef.current = callPhase;
   }, [callPhase]);
+
+  // Routes the call microphone through an extra cleanup chain: rumble/hiss
+  // filters + compressor + an aggressive noise gate. What the other side
+  // hears is only the voice, so calls sound clean and professional.
+  const prepareCallMedia = async (rawStream) => {
+    rawStream.getAudioTracks().forEach(primeAudioTrack);
+    const cleaned = await buildVoiceStream(rawStream, { silentGain: 0.02, threshold: 0.018 });
+    const sendStream = new MediaStream([
+      ...cleaned.stream.getAudioTracks(),
+      ...rawStream.getVideoTracks(),
+    ]);
+    return { sendStream, cleanup: cleaned.cleanup };
+  };
 
   // Call duration ticks only while the call is actually connected
   useEffect(() => {
@@ -333,17 +352,20 @@ export default function Chat() {
     try {
       // Noise suppression + echo cancellation + auto gain + voice isolation —
       // keeps background noise out of the call (crystal-clear voice, Messenger-style).
-      const stream = await navigator.mediaDevices.getUserMedia({
+      const rawStream = await navigator.mediaDevices.getUserMedia({
         audio: {
           noiseSuppression: true,
           echoCancellation: true,
           autoGainControl: true,
           voiceIsolation: true,
+          channelCount: 1,
           advanced: [{ noiseSuppression: true, echoCancellation: true, autoGainControl: true }],
         },
         video: kind === "video",
       });
-      stream.getAudioTracks().forEach(primeAudioTrack); // re-assert noise cleaning on the real track
+      const { sendStream: stream, cleanup: callCleanup } = await prepareCallMedia(rawStream);
+      rawCallStreamRef.current = rawStream;
+      callCleanupRef.current = callCleanup;
       localStreamRef.current = stream;
       const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
       pcRef.current = pc;
@@ -394,23 +416,53 @@ export default function Chat() {
     }
   };
 
+  // Release the mic, camera and DSP graph if the screen unmounts mid-call.
+  useEffect(
+    () => () => {
+      try {
+        pcRef.current?.close();
+      } catch {
+        /* ignore */
+      }
+      try {
+        localStreamRef.current?.getTracks().forEach((t) => t.stop());
+      } catch {
+        /* ignore */
+      }
+      try {
+        rawCallStreamRef.current?.getTracks().forEach((t) => t.stop());
+      } catch {
+        /* ignore */
+      }
+      try {
+        callCleanupRef.current?.();
+      } catch {
+        /* ignore */
+      }
+    },
+    []
+  );
+
   const acceptCall = async () => {
     if (!incomingCall || inCall) return;
     stopRing();
     if (ringTimeoutRef.current) clearTimeout(ringTimeoutRef.current);
     try {
       // Same clean-audio constraints on the accepting side.
-      const stream = await navigator.mediaDevices.getUserMedia({
+      const rawStream = await navigator.mediaDevices.getUserMedia({
         audio: {
           noiseSuppression: true,
           echoCancellation: true,
           autoGainControl: true,
           voiceIsolation: true,
+          channelCount: 1,
           advanced: [{ noiseSuppression: true, echoCancellation: true, autoGainControl: true }],
         },
         video: incomingCall.callType === "video",
       });
-      stream.getAudioTracks().forEach(primeAudioTrack); // re-assert noise cleaning on the real track
+      const { sendStream: stream, cleanup: callCleanup } = await prepareCallMedia(rawStream);
+      rawCallStreamRef.current = rawStream;
+      callCleanupRef.current = callCleanup;
       localStreamRef.current = stream;
       const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
       pcRef.current = pc;
@@ -463,6 +515,16 @@ export default function Chat() {
     detachPeer();
     if (localStreamRef.current) localStreamRef.current.getTracks().forEach((t) => t.stop());
     localStreamRef.current = null;
+    // The mic owns the raw tracks; the DSP context must be closed too so the
+    // microphone indicator really turns off after hanging up.
+    if (rawCallStreamRef.current) rawCallStreamRef.current.getTracks().forEach((t) => t.stop());
+    rawCallStreamRef.current = null;
+    try {
+      callCleanupRef.current?.();
+    } catch {
+      /* ignore */
+    }
+    callCleanupRef.current = null;
     if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
     if (localVideoRef.current) localVideoRef.current.srcObject = null;
     if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null;
@@ -629,8 +691,16 @@ export default function Chat() {
 
   // Mark conversation as read when opened
   useEffect(() => {
-    if (!activeId) return;
+    if (!activeId) {
+      setActiveConversation(null);
+      return;
+    }
     chatApi.markRead(activeId).catch(() => {});
+    // Clear the conversation-list highlight/unread badge for the opened chat.
+    setActiveConversation(activeId);
+    setConversations((prev) =>
+      prev.map((c) => (c._id === activeId ? { ...c, unreadCount: 0 } : c)),
+    );
     const msgs = messages;
     if (socket && msgs.length) {
       socket.emit("message:read", { conversationId: activeId, messageIds: msgs.map((m) => m._id) });
@@ -726,24 +796,42 @@ export default function Chat() {
       const convId = typeof conversation === "string" ? conversation : conversation?._id;
       if (!convId || !msg._id) return;
       const isActiveConv = String(convId) === String(activeIdRef.current);
+      const isMine = String(msg.sender?._id || msg.sender) === String(user?._id);
 
       if (isActiveConv) {
         setMessages((prev) =>
           prev.some((m) => m._id === msg._id) ? prev : [...prev, msg],
         );
         // no temporary highlight; message keeps its normal color
-      } else {
-        setUnreadIds((prev) => new Set(prev).add(convId));
+      } else if (!isMine) {
+        // Global unread set — the conversation row stays highlighted even if
+        // the user leaves /chat and comes back.
+        setUnreadConversations((prev) => {
+          if (prev.has(convId)) return prev;
+          const next = new Set(prev);
+          next.add(convId);
+          return next;
+        });
       }
 
       // Keep the conversation list preview + order fresh without a reload
       setConversations((prev) => {
+        // Unknown conversation (e.g. brand-new chat with someone)? Reload the
+        // list so it appears with its unread badge instead of being dropped.
+        if (!prev.some((c) => c._id === convId)) {
+          if (!isActiveConv && !isMine) loadConversations();
+          return prev;
+        }
         const next = prev.map((c) =>
           c._id === convId
             ? {
                 ...c,
                 lastMessage: { text: msgPreview(msg), sender: msg.sender },
                 lastMessageAt: msg.createdAt || new Date().toISOString(),
+                // Only unseen messages count — messages in the open chat are
+                // read immediately, so they never bump the badge.
+                unreadCount:
+                  isActiveConv || isMine ? c.unreadCount || 0 : (c.unreadCount || 0) + 1,
               }
             : c,
         );
@@ -768,11 +856,7 @@ export default function Chat() {
         : rawConversationId?._id;
       if (!conversationId) return;
       setConversations((prev) => prev.filter((c) => c._id !== conversationId));
-      setUnreadIds((prev) => {
-        const next = new Set(prev);
-        next.delete(conversationId);
-        return next;
-      });
+      clearConversationUnread(conversationId);
       if (conversationId === activeIdRef.current) {
         setActiveId(null);
         setMessages([]);
@@ -1654,37 +1738,34 @@ export default function Chat() {
               c.type === "group"
                 ? null
                 : c.participants?.find((p) => p._id !== user?._id);
-            const unread = unreadIds.has(c._id);
+            const unreadCount = c.unreadCount || 0;
+            const unread = unreadCount > 0 || unreadConversations.has(c._id);
             return (
               <div
                 key={c._id}
                 onClick={() => {
                   setActiveId(c._id);
                   setMobileView("chat");
-                  setUnreadIds((prev) => {
-                    const next = new Set(prev);
-                    next.delete(c._id);
-                    return next;
-                  });
+                  setConversations((prev) =>
+                    prev.map((x) =>
+                      x._id === c._id ? { ...x, unreadCount: 0 } : x,
+                    ),
+                  );
+                  clearConversationUnread(c._id);
                 }}
                 className={`group/conv w-full text-left p-3 rounded-xl mb-2 transition flex items-center gap-3 cursor-pointer ${
-                  unread
-                    ? "bg-slate-200 ring-2 ring-slate-400"
-                    : activeId === c._id
-                      ? "bg-slate-300"
-                      : "hover:bg-slate-100"
+                  activeId === c._id ? "bg-slate-300" : "hover:bg-slate-100"
                 }`}
               >
                 <div className="relative">
                   <img
                     src={other?.avatar || "https://via.placeholder.com/40"}
                     alt=""
-                    className={`w-10 h-10 rounded-full object-cover ${unread ? "ring-2 ring-brand" : ""}`}
+                    className="w-10 h-10 rounded-full object-cover"
                   />
-                  {unread && <span className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-brand border-2 border-white" />}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className={`text-sm truncate flex items-center gap-1.5 ${unread ? "font-bold text-slate-900" : "font-medium text-slate-800"}`}>
+                  <p className={`text-sm truncate flex items-center gap-1.5 ${unread ? "font-bold text-brand" : "font-medium text-slate-800"}`}>
                     <span className="truncate">
                       {c.type === "group" ? c.groupName : other?.fullname}
                     </span>
@@ -1697,10 +1778,15 @@ export default function Chat() {
                       />
                     )}
                   </p>
-                  <p className={`text-xs truncate ${unread ? "text-slate-800 font-semibold" : "text-slate-400"}`}>
+                  <p className={`text-xs truncate ${unread ? "text-slate-900 font-semibold" : "text-slate-400"}`}>
                     {c.lastMessage?.text || "No messages yet"}
                   </p>
                 </div>
+                {unreadCount > 0 && (
+                  <span className="shrink-0 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-brand text-white text-[11px] font-bold">
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                )}
                 <div className="relative shrink-0">
                   <button
                     onClick={(e) => {
@@ -1902,7 +1988,7 @@ export default function Chat() {
                 </span>
               </div>
               {/* Media — Messenger-style. Tap either video to swap big/small. */}
-              <div className="relative flex-1 min-h-0">
+              <div className="relative flex-1 min-h-0 overflow-hidden">
                 {callType === "video" ? (
                   <>
                     {/* Remote (big by default) */}
@@ -1945,20 +2031,33 @@ export default function Chat() {
                     )}
                   </>
                 ) : (
-                  <div className="relative w-36 h-36 sm:w-44 sm:h-44">
-                    <span className="absolute inset-0 rounded-full bg-indigo-400/25 animate-ping" />
-                    <span className="absolute -inset-5 rounded-full bg-indigo-400/15 animate-ping [animation-delay:300ms]" />
-                    <span className="absolute -inset-10 rounded-full bg-indigo-400/10 animate-ping [animation-delay:600ms]" />
-                    <img
-                      src={otherParticipant?.avatar || "https://via.placeholder.com/176"}
-                      alt=""
-                      className="relative w-36 h-36 sm:w-44 sm:h-44 rounded-full object-cover border-4 border-white/70 shadow-[0_0_70px_rgba(99,102,241,0.4)]"
-                    />
+                  /* Voice call — profile stays dead-centre of the media area
+                     (before this it collapsed into the top-left corner). */
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 sm:gap-6 px-6">
+                    <div className="relative w-32 h-32 sm:w-44 sm:h-44 shrink-0">
+                      <span className="absolute inset-0 rounded-full bg-indigo-400/25 animate-ping" />
+                      <span className="absolute -inset-5 rounded-full bg-indigo-400/15 animate-ping [animation-delay:300ms]" />
+                      <span className="absolute -inset-10 rounded-full bg-indigo-400/10 animate-ping [animation-delay:600ms]" />
+                      <img
+                        src={otherParticipant?.avatar || "https://via.placeholder.com/176"}
+                        alt=""
+                        className="relative w-32 h-32 sm:w-44 sm:h-44 rounded-full object-cover border-4 border-white/70 shadow-[0_0_70px_rgba(99,102,241,0.4)]"
+                      />
+                    </div>
+                    <div className="text-center max-w-[80vw]">
+                      <p className="text-lg sm:text-xl font-bold text-white drop-shadow-lg truncate">
+                        {otherParticipant?.fullname || "…"}
+                      </p>
+                      <p className="mt-1.5 text-xs text-white/60 flex items-center justify-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        {fmtTime(callSeconds)}
+                      </p>
+                    </div>
                   </div>
                 )}
               </div>
               {/* Floating glass control bar */}
-              <div className="relative flex items-center justify-center px-4 pb-8 pt-4">
+              <div className="relative flex items-center justify-center px-4 pt-4 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
                 <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 rounded-full bg-white/10 backdrop-blur-xl border border-white/15 px-4 py-2.5 shadow-[0_8px_40px_rgba(0,0,0,0.5)] max-w-[94vw]">
                   <button
                     onClick={toggleMute}
@@ -2030,7 +2129,7 @@ export default function Chat() {
           )}
           {/* Minimized call bar */}
           {inCall && callPhase === "connected" && callMinimized && (
-            <div className="fixed top-20 right-2 sm:right-4 left-2 sm:left-auto z-[80] flex items-center justify-center sm:justify-start gap-2.5 sm:gap-3 rounded-2xl bg-slate-900/80 backdrop-blur-xl border border-white/10 shadow-[0_8px_40px_rgba(0,0,0,0.45)] px-3 sm:px-4 py-3 text-white max-w-[calc(100vw-1rem)] sm:max-w-none">
+            <div className="fixed top-16 sm:top-20 left-1/2 -translate-x-1/2 z-[80] flex items-center gap-2.5 rounded-2xl bg-slate-900/85 backdrop-blur-xl border border-white/10 shadow-[0_8px_40px_rgba(0,0,0,0.45)] px-3 sm:px-4 py-3 text-white w-[min(92vw,340px)]">
               <img
                 src={otherParticipant?.avatar || "https://via.placeholder.com/40"}
                 alt=""
@@ -2073,10 +2172,8 @@ export default function Chat() {
               // Day separator: show when this group starts a new calendar day
               const firstMsgTime = new Date(group.messages[0]?.createdAt || Date.now());
               const prevGroupLast = gi > 0 ? grouped[gi - 1].messages[grouped[gi - 1].messages.length - 1] : null;
-              // Call-history notes must sit dead-centre of the whole thread, not
-              // right/left-aligned like a chat bubble — so this group gets the
-              // full row width and the messages keep their own 85% cap.
-              const groupHasCallLog = group.messages.some((m) => m.callMeta?.status);
+              // The row is always full width so call-history notes can sit
+              // dead-centre; each bubble caps itself at 85%/75% instead.
               const showDaySep =
                 !prevGroupLast ||
                 firstMsgTime.toDateString() !== new Date(prevGroupLast.createdAt).toDateString();
@@ -2094,7 +2191,7 @@ export default function Chat() {
                 <div
                   className={`flex ${isMe ? "justify-end" : "justify-start"}`}
                 >
-                  <div className={groupHasCallLog ? "w-full" : "max-w-[85%] sm:max-w-[75%]"}>
+                  <div className="w-full">
                     <div className="space-y-1">
                       {group.messages.map((m) =>
                         m.callMeta?.status || isLegacyCallText(m.text) ? (
@@ -2213,7 +2310,7 @@ export default function Chat() {
                                 )}
                               </div>
                             )}
-                            <div className={`flex flex-col min-w-0 ${groupHasCallLog ? "max-w-[85%] sm:max-w-[75%]" : ""}`}>
+                            <div className="flex flex-col min-w-0 max-w-[85%] sm:max-w-[75%]">
                               {!isMe && activeConv?.type === "group" && (
                                 <span className="text-[10px] font-semibold text-slate-500 mb-0.5 ml-1">
                                   {group.sender?.fullname}
@@ -2439,7 +2536,7 @@ export default function Chat() {
               </button>
             </div>
           ) : (
-            <form onSubmit={sendMessage} className="border-t shrink-0">
+            <form onSubmit={sendMessage} className="border-t shrink-0 pb-[env(safe-area-inset-bottom)] bg-white">
               {pendingImage && !recording && (
                 <div className="px-3 sm:px-4 pt-3 flex items-center gap-2">
                   <div className="relative shrink-0">

@@ -92,7 +92,13 @@ export function describeOAuthFailure(error) {
   }
 
   if (status === 401) {
-    return { message: "Login failed. Please try again.", tone: "error", pending: false };
+    // The backend returns a specific reason when Auth0 token verification
+    // fails (for example a missing AUTH0_DOMAIN/AUTH0_CLIENT_ID on the server).
+    return {
+      message: backendMessage || "Login failed. Please try again.",
+      tone: "error",
+      pending: false,
+    };
   }
 
   return {

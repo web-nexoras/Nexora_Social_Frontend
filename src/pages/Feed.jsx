@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import { postsApi } from "../api/postsApi";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
@@ -85,6 +86,8 @@ function PostImages({ images, onOpen }) {
 export default function Feed() {
   const { user } = useAuth();
   const { showToast } = useToast();
+  const [searchParams] = useSearchParams();
+  const focusPostId = searchParams.get("post");
   const [posts, setPosts] = useState([]);
   const [cursor, setCursor] = useState(null);
   const [hasMore, setHasMore] = useState(true);
@@ -115,6 +118,10 @@ export default function Feed() {
   const editFileRef = useRef();
   const [pickerPostId, setPickerPostId] = useState(null); // hover reaction picker
   const [lightbox, setLightbox] = useState(null); // { images: [], index: 0 } full-screen viewer
+  const [highlightPostId, setHighlightPostId] = useState(null); // deep-linked notification target
+  const focusedPostRef = useRef(false);
+  const scrollTimerRef = useRef(null);
+  const highlightTimerRef = useRef(null);
   const pickerTimerRef = useRef(null);
 
   // Close the post menu when clicking anywhere outside it.
@@ -163,7 +170,19 @@ export default function Feed() {
     setLoading(true);
     try {
       const res = await postsApi.feed(nextCursor);
-      const newPosts = res.data?.posts || [];
+      let newPosts = res.data?.posts || [];
+
+      // Deep link from a notification: if the target post is not on the first
+      // feed page (older post), fetch it and show it at the top.
+      if (!nextCursor && focusPostId && !newPosts.some((p) => String(p._id) === String(focusPostId))) {
+        try {
+          const single = await postsApi.get(focusPostId);
+          if (single.data?.post) newPosts = [single.data.post, ...newPosts];
+        } catch {
+          // Deleted or not visible — keep the normal feed.
+        }
+      }
+
       setPosts((prev) => (nextCursor ? [...prev, ...newPosts] : newPosts));
       setCursor(res.data?.nextCursor || null);
       setHasMore(!!res.data?.hasMore);
@@ -177,6 +196,36 @@ export default function Feed() {
   useEffect(() => {
     loadFeed();
   }, []);
+
+  // Scroll to and open the comments of the notification's target post.
+  useEffect(() => {
+    if (!focusPostId || focusedPostRef.current) return;
+    const el = document.getElementById(`post-${focusPostId}`);
+    if (!el) return;
+
+    focusedPostRef.current = true;
+    setOpenComments((prev) => ({ ...prev, [focusPostId]: true }));
+    if (!comments[focusPostId]) {
+      postsApi
+        .comments(focusPostId)
+        .then((res) => setComments((prev) => ({ ...prev, [focusPostId]: res.data?.comments || [] })))
+        .catch(() => {});
+    }
+    setHighlightPostId(focusPostId);
+    scrollTimerRef.current = setTimeout(
+      () => el.scrollIntoView({ behavior: "smooth", block: "center" }),
+      150,
+    );
+    highlightTimerRef.current = setTimeout(() => setHighlightPostId(null), 2800);
+  }, [focusPostId, posts]);
+
+  useEffect(
+    () => () => {
+      clearTimeout(scrollTimerRef.current);
+      clearTimeout(highlightTimerRef.current);
+    },
+    [],
+  );
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -421,7 +470,13 @@ export default function Feed() {
         const isOwner = author._id === user?._id || author === user?._id;
         const totalReactions = REACTIONS.reduce((s, r) => s + (post.reactionCounts?.[r.key] || 0), 0);
         return (
-          <div key={post._id} className="bg-white rounded-2xl shadow p-3 sm:p-4 space-y-3">
+          <div
+            key={post._id}
+            id={`post-${post._id}`}
+            className={`bg-white rounded-2xl shadow p-3 sm:p-4 space-y-3 transition ${
+              highlightPostId === post._id ? "ring-2 ring-indigo-400 ring-offset-2" : ""
+            }`}
+          >
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-3 min-w-0">
                 <img src={author.avatar || "https://via.placeholder.com/40"} alt="" className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover shrink-0" />

@@ -2,13 +2,15 @@ import React, { useEffect, useState } from "react";
 import { notificationsApi } from "../api/notificationsApi";
 import { useToast } from "../context/ToastContext";
 import { useSocket } from "../context/SocketContext";
-import { Link } from "react-router-dom";
-import { FiBell, FiCheck } from "react-icons/fi";
+import { useNavigate } from "react-router-dom";
+import { FiBell, FiCheck, FiArrowRight } from "react-icons/fi";
 import Skeleton from "../components/Skeleton";
+import { getNotificationTarget } from "../utils/notificationTarget";
 
 export default function Notifications() {
   const { showToast } = useToast();
   const { socket } = useSocket();
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
   const [unread, setUnread] = useState(0);
@@ -56,6 +58,21 @@ export default function Notifications() {
     } catch {}
   };
 
+  // A notification is an entry point, not just a status badge: mark it read
+  // and open the screen it belongs to (post, chat, friend requests, ...).
+  const openNotification = (n) => {
+    if (!n.read) markRead(n);
+    const target = getNotificationTarget(n);
+    if (target) navigate(target);
+  };
+
+  const handleKeyDown = (e, n) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      openNotification(n);
+    }
+  };
+
   return (
     <div className="max-w-3xl mx-auto py-6 px-4">
       <div className="flex items-center justify-between mb-4">
@@ -74,20 +91,32 @@ export default function Notifications() {
       {!loading && notifications.length === 0 && <p className="text-slate-500 text-sm">No notifications yet</p>}
 
       <div className="space-y-2">
-        {notifications.map((n) => (
-          <div
-            key={n._id}
-            onClick={() => !n.read && markRead(n)}
-            className={`bg-white rounded-xl shadow p-4 cursor-pointer transition ${n.read ? "opacity-70" : "ring-2 ring-brand/30"}`}
-          >
-            <p className="font-semibold text-slate-800">{n.title}</p>
-            <p className="text-sm text-slate-600">{n.body}</p>
-            <p className="text-xs text-slate-400 mt-1">{new Date(n.createdAt).toLocaleString()}</p>
-            {n.data?.postId && (
-              <Link to={`/feed`} className="text-xs text-brand hover:underline">View post</Link>
-            )}
-          </div>
-        ))}
+        {notifications.map((n) => {
+          const target = getNotificationTarget(n);
+          return (
+            <div
+              key={n._id}
+              role="button"
+              tabIndex={0}
+              onClick={() => openNotification(n)}
+              onKeyDown={(e) => handleKeyDown(e, n)}
+              className={`bg-white rounded-xl shadow p-4 cursor-pointer transition hover:shadow-md focus:outline-none focus:ring-2 focus:ring-brand/40 ${
+                n.read ? "opacity-70" : "ring-2 ring-brand/30"
+              }`}
+            >
+              <p className="font-semibold text-slate-800">{n.title}</p>
+              <p className="text-sm text-slate-600">{n.body}</p>
+              <div className="flex items-center justify-between gap-3 mt-1">
+                <p className="text-xs text-slate-400">{new Date(n.createdAt).toLocaleString()}</p>
+                {target && (
+                  <span className="text-xs text-brand font-semibold flex items-center gap-1 shrink-0">
+                    Open <FiArrowRight />
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

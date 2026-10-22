@@ -96,7 +96,7 @@ function VoicePlayer({ src, isMe }) {
   const sub = isMe ? "rgba(255,255,255,0.85)" : "#64748b";
 
   return (
-    <div className="flex items-center gap-2.5 w-[218px] max-w-[64vw]">
+    <div className="flex items-center gap-2.5 w-[218px] max-w-[52vw] min-w-0">
       <button
         type="button"
         onClick={toggle}
@@ -118,14 +118,16 @@ function VoicePlayer({ src, isMe }) {
           aria-valuemin={0}
           aria-valuemax={Math.round(duration) || 0}
           aria-valuenow={Math.round(current) || 0}
-          className="flex items-center gap-[1.5px] h-7 cursor-pointer select-none"
+          className="flex items-center gap-[1.5px] h-7 cursor-pointer select-none overflow-hidden"
         >
           {BARS.map((h, i) => (
             <span
               key={i}
+              className={i % 2 ? "hidden sm:block" : ""}
               style={{
                 height: h,
                 width: 2.5,
+                flexShrink: 0,
                 borderRadius: 999,
                 background: i / BARS.length <= ratio ? filled : empty,
                 transition: "background 140ms linear",

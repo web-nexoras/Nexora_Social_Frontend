@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import AuthShell from "../components/AuthShell";
 import PasswordInput from "../components/PasswordInput";
+import SocialAuthButtons from "../components/SocialAuthButtons";
 
 export default function Signup() {
   const { signup } = useAuth();
@@ -142,6 +143,8 @@ export default function Signup() {
           {loading ? "Signing up..." : "Sign Up"}
         </button>
       </form>
+
+      <SocialAuthButtons onError={setGeneralError} disabled={loading} />
     </AuthShell>
   );
 }

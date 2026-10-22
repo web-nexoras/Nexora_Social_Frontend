@@ -55,6 +55,14 @@ export default function Friends() {
     }
   }, [searchQuery]);
 
+  // Deep links from notifications (e.g. "/friends?tab=incoming").
+  useEffect(() => {
+    const requested = (searchParams.get("tab") || "").toLowerCase();
+    if (!requested) return;
+    const match = TABS.find((tab) => tab.toLowerCase() === requested);
+    if (match) setActiveTab(match);
+  }, [searchParams]);
+
   const sendRequest = async (userId) => {
     try {
       await friendsApi.sendRequest(userId);

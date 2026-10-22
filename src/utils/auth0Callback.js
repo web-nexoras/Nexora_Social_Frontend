@@ -25,6 +25,15 @@ export const auth0CallbackOnLoad = Boolean(
   initialParams.error || (initialParams.code && initialParams.state),
 );
 
+// The root route ("/") immediately redirects guests to /signin. That redirect
+// drops the Auth0 ?code=&state= query string, and the SDK can no longer finish
+// the token exchange. Callers can use this helper to hold their redirect until
+// the SDK has consumed the callback params.
+export function hasAuth0CallbackParams() {
+  const current = readUrlParams();
+  return Boolean(current.error || (current.code && current.state));
+}
+
 // Returns the Auth0 error carried in the URL, if any. Falls back to the values
 // captured at load time because the SDK may already have cleaned the URL.
 export function readAuth0UrlError() {
