@@ -317,3 +317,16 @@ select:not(.neo-input):focus {
 .call-enter {
   animation: call-enter 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
+
+/* Chat messages: scrolling still works, but the scrollbar stays invisible
+   (Messenger-style). Applies to Chrome/Safari/Edge and Firefox. */
+.chat-scroll {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* legacy Edge / IE */
+  -webkit-overflow-scrolling: touch;
+}
+.chat-scroll::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}

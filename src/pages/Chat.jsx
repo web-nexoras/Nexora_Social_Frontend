@@ -10,6 +10,7 @@ import { friendsApi } from "../api/friendsApi";
 import { followsApi } from "../api/followsApi";
 import { ICE_SERVERS } from "../api/config";
 import PaymentMethodModal from "../components/PaymentMethodModal";
+import MessageAttachments from "../components/ChatMedia";
 import Skeleton from "../components/Skeleton";
 import {
   FiBell,
@@ -26,6 +27,8 @@ import {
   FiSmile,
   FiBookmark,
   FiInfo,
+  FiImage,
+  FiSend,
 } from "react-icons/fi";
 import {
   LuPhone,
@@ -36,6 +39,7 @@ import {
   LuMicOff,
   LuMinimize2,
   LuRefreshCw,
+  LuSquare,
 } from "react-icons/lu";
 
 // FB-style message reactions (long-press the bubble to open the picker)
@@ -48,6 +52,27 @@ const MSG_REACTIONS = [
   { key: "angry", emoji: "😠", label: "Angry" },
 ];
 const MSG_EMOJI = Object.fromEntries(MSG_REACTIONS.map((r) => [r.key, r.emoji]));
+
+// Older call-log rows were stored as plain text (before `callMeta` existed).
+// They should still render as centered system notes, never as chat bubbles.
+const isLegacyCallText = (text) => {
+  const t = String(text || "").trim();
+  if (!t) return false;
+  return /^(📞\s*)?((missed|declined|no answer)\s+)?(voice|video)\s+call\b/i.test(t) ||
+    /^call (ended|declined|missed|answered)\b/i.test(t);
+};
+
+// One-line preview for the conversation list (photos/voice have no text).
+const msgPreview = (m) => {
+  const t = String(m?.text || "").trim();
+  if (t) return t;
+  const kind = m?.attachmentType;
+  if (kind === "voice") return "🎤 Voice message";
+  if (kind === "video") return "🎬 Video";
+  if (kind === "file") return "📎 Attachment";
+  if (Array.isArray(m?.attachments) && m.attachments.length) return "📷 Photo";
+  return "No messages yet";
+};
 
 // Force every mic track through the strongest noise-cleaning pipeline the
 // browser offers: noise suppression, echo cancellation, auto gain + voice
@@ -68,6 +93,93 @@ const primeAudioTrack = (track) => {
   }
 };
 
+// Extra DSP in front of MediaRecorder so the voice note only carries the
+// speaker's voice: low rumble/hiss are filtered out, levels are evened out and
+// a soft noise gate mutes whatever is below speaking level (fan noise, TV,
+// people chatting in the background) instead of recording it.
+const buildVoiceStream = async (rawStream) => {
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  if (!AudioCtx || !rawStream) return { stream: rawStream, cleanup: () => {} };
+  try {
+    const ctx = new AudioCtx();
+    if (ctx.state === "suspended") {
+      await ctx.resume().catch(() => {});
+    }
+    // If the browser keeps the context suspended we would record pure silence,
+    // so fall back to the raw (browser-cleaned) mic stream instead.
+    if (ctx.state !== "running") {
+      try {
+        ctx.close();
+      } catch {
+        /* ignore */
+      }
+      return { stream: rawStream, cleanup: () => {} };
+    }
+    const source = ctx.createMediaStreamSource(rawStream);
+
+    const highpass = ctx.createBiquadFilter();
+    highpass.type = "highpass";
+    highpass.frequency.value = 95; // kills desk bumps / AC hum
+    highpass.Q.value = 0.7;
+
+    const lowpass = ctx.createBiquadFilter();
+    lowpass.type = "lowpass";
+    lowpass.frequency.value = 7600; // kills hiss / high-frequency chatter
+
+    const compressor = ctx.createDynamicsCompressor();
+    compressor.threshold.value = -55;
+    compressor.knee.value = 30;
+    compressor.ratio.value = 12;
+    compressor.attack.value = 0.003;
+    compressor.release.value = 0.25;
+
+    const gate = ctx.createGain();
+    gate.gain.value = 1;
+
+    // Measure the level with an analyser; the audio itself flows straight
+    // through gate → destination (a ScriptProcessor would swallow the signal
+    // and produce a silent recording).
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 512;
+    const levels = new Float32Array(analyser.fftSize);
+
+    const destination = ctx.createMediaStreamDestination();
+    source.connect(highpass);
+    highpass.connect(lowpass);
+    lowpass.connect(compressor);
+    compressor.connect(analyser);
+    analyser.connect(gate);
+    gate.connect(destination);
+
+    // Speaking level opens the gate instantly; silence fades it out so
+    // background chatter never reaches the recording.
+    const gateTimer = setInterval(() => {
+      analyser.getFloatTimeDomainData(levels);
+      let peak = 0;
+      for (let i = 0; i < levels.length; i += 1) {
+        const v = Math.abs(levels[i]);
+        if (v > peak) peak = v;
+      }
+      const speaking = peak > 0.015;
+      gate.gain.setTargetAtTime(speaking ? 1 : 0.08, ctx.currentTime, speaking ? 0.01 : 0.12);
+    }, 50);
+
+    return {
+      stream: destination.stream,
+      cleanup: () => {
+        clearInterval(gateTimer);
+        try {
+          ctx.close();
+        } catch {
+          /* ignore */
+        }
+      },
+    };
+  } catch {
+    return { stream: rawStream, cleanup: () => {} };
+  }
+};
+
 export default function Chat() {
   const [searchParams] = useSearchParams();
   const targetUserId = searchParams.get("user");
@@ -85,6 +197,21 @@ export default function Chat() {
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
+  // Composer extras: photo attachment + voice recording (Messenger-style).
+  const [pendingImage, setPendingImage] = useState(null); // { file, url }
+  const [uploading, setUploading] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [recordSec, setRecordSec] = useState(0);
+  const fileInputRef = useRef(null);
+  const recorderRef = useRef(null);
+  const recordChunksRef = useRef([]);
+  const recordStreamRef = useRef(null);
+  const voiceCleanupRef = useRef(null);
+  const recordTimerRef = useRef(null);
+  const recordCancelledRef = useRef(false);
+  const recordStartRef = useRef(0);
+  const recordConvRef = useRef(null);
+  const pendingImageRef = useRef(null);
   const [loading, setLoading] = useState(false);
   const [mobileView, setMobileView] = useState("list");
   // highlighted state removed to avoid temporary color/border on new messages
@@ -615,7 +742,7 @@ export default function Chat() {
           c._id === convId
             ? {
                 ...c,
-                lastMessage: { text: msg.text || "", sender: msg.sender },
+                lastMessage: { text: msgPreview(msg), sender: msg.sender },
                 lastMessageAt: msg.createdAt || new Date().toISOString(),
               }
             : c,
@@ -740,6 +867,12 @@ export default function Chat() {
 
   // ---- Message editing ----
   const startEdit = (m) => {
+    // Media messages (photo / voice / video / file) are not editable —
+    // only plain text can be changed; anything else can just be deleted.
+    if (Array.isArray(m.attachments) && m.attachments.length > 0) {
+      showToast("Media messages can't be edited — you can delete it instead", "info");
+      return;
+    }
     setEditingId(m._id);
     setEditText(m.text || "");
   };
@@ -818,30 +951,319 @@ export default function Chat() {
     return () => document.removeEventListener("click", close);
   }, [msgMenuId, reactPickerFor]);
 
+  // ---------- Photo & voice messages (Messenger-style) ----------
+  const clearPendingImage = () => {
+    const current = pendingImageRef.current;
+    if (current?.url) URL.revokeObjectURL(current.url);
+    pendingImageRef.current = null;
+    setPendingImage(null);
+  };
+
+  const setPendingImageFile = (next) => {
+    const prev = pendingImageRef.current;
+    if (prev?.url && prev.url !== next?.url) URL.revokeObjectURL(prev.url);
+    pendingImageRef.current = next;
+    setPendingImage(next);
+  };
+
+  const pickImage = (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      showToast("Please choose an image file", "error");
+      return;
+    }
+    if (file.size > 25 * 1024 * 1024) {
+      showToast("Image is too large (max 25 MB)", "error");
+      return;
+    }
+    setPendingImageFile({ file, url: URL.createObjectURL(file) });
+  };
+
+  const uploadChatFile = async (file) => {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await chatApi.uploadMedia(form);
+    const url = res.data?.url;
+    if (!url) throw new Error("Upload failed");
+    return { url, type: res.data?.type };
+  };
+
+  const appendMessage = (msg) => {
+    if (!msg?._id) return;
+    const convId = typeof msg.conversation === "string" ? msg.conversation : msg.conversation?._id;
+    setMessages((prev) => (prev.some((m) => m._id === msg._id) ? prev : [...prev, msg]));
+    if (convId) {
+      setConversations((prev) =>
+        prev.map((c) =>
+          c._id === convId
+            ? {
+                ...c,
+                lastMessage: { text: msgPreview(msg), sender: msg.sender },
+                lastMessageAt: msg.createdAt || new Date().toISOString(),
+              }
+            : c,
+        ),
+      );
+    }
+  };
+
+  const stopMicTracks = () => {
+    try {
+      recordStreamRef.current?.getTracks().forEach((t) => t.stop());
+    } catch {
+      /* ignore */
+    }
+    recordStreamRef.current = null;
+    try {
+      voiceCleanupRef.current?.();
+    } catch {
+      /* ignore */
+    }
+    voiceCleanupRef.current = null;
+  };
+
+  const stopRecording = (cancelled = false) => {
+    recordCancelledRef.current = !!cancelled;
+    const rec = recorderRef.current;
+    if (!rec) {
+      stopMicTracks();
+      setRecording(false);
+      return;
+    }
+    try {
+      if (rec.state !== "inactive") rec.stop();
+    } catch {
+      stopMicTracks();
+      recorderRef.current = null;
+      setRecording(false);
+    }
+  };
+
+  const startRecording = async () => {
+    if (recording || sending || uploading || !activeId) return;
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      showToast("Voice recording is not supported in this browser", "error");
+      return;
+    }
+    if (!window.isSecureContext) {
+      showToast("Voice recording needs HTTPS (or localhost)", "error");
+      return;
+    }
+    if (pendingImage) {
+      showToast("Send or remove the photo first", "info");
+      return;
+    }
+
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          noiseSuppression: true,
+          echoCancellation: true,
+          autoGainControl: true,
+          voiceIsolation: true,
+          channelCount: 1,
+        },
+      });
+    } catch {
+      showToast("Microphone permission denied", "error");
+      return;
+    }
+    stream.getAudioTracks().forEach((t) => primeAudioTrack(t));
+
+    // Browser-suppressed mic ➜ extra filter + noise gate before recording.
+    const cleaned = await buildVoiceStream(stream);
+
+    let rec;
+    let mimeType = "";
+    try {
+      const preferred = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus", "audio/ogg"];
+      mimeType = preferred.find((t) => {
+        try {
+          return MediaRecorder.isTypeSupported(t);
+        } catch {
+          return false;
+        }
+      }) || "";
+      rec = new MediaRecorder(cleaned.stream, mimeType ? { mimeType } : undefined);
+    } catch {
+      cleaned.cleanup?.();
+      stream.getTracks().forEach((t) => t.stop());
+      showToast("Could not start recording", "error");
+      return;
+    }
+    voiceCleanupRef.current = cleaned.cleanup;
+
+    const capturedConv = activeId;
+    const capturedMime = (rec.mimeType || mimeType || "audio/webm").split(";")[0];
+
+    recordChunksRef.current = [];
+    recordCancelledRef.current = false;
+    recordStartRef.current = Date.now();
+    recordConvRef.current = capturedConv;
+    recordStreamRef.current = stream;
+    recorderRef.current = rec;
+
+    rec.ondataavailable = (ev) => {
+      if (ev.data && ev.data.size > 0) recordChunksRef.current.push(ev.data);
+    };
+    rec.onerror = () => {
+      showToast("Recording failed", "error");
+      try {
+        if (rec.state !== "inactive") rec.stop();
+      } catch {
+        /* ignore */
+      }
+    };
+    rec.onstop = async () => {
+      if (recordTimerRef.current) {
+        clearInterval(recordTimerRef.current);
+        recordTimerRef.current = null;
+      }
+      stopMicTracks();
+      try {
+        voiceCleanupRef.current?.();
+      } catch {
+        /* ignore */
+      }
+      voiceCleanupRef.current = null;
+      recorderRef.current = null;
+      setRecording(false);
+      setRecordSec(0);
+
+      const seconds = Math.max(0, Math.round((Date.now() - recordStartRef.current) / 1000));
+      const chunks = recordChunksRef.current;
+      recordChunksRef.current = [];
+      if (recordCancelledRef.current) return;
+      if (!chunks.length) {
+        showToast("Nothing was recorded", "error");
+        return;
+      }
+      if (seconds < 1) {
+        showToast("Too short — hold and speak a bit longer", "info");
+        return;
+      }
+
+      const blob = new Blob(chunks, { type: capturedMime });
+      const ext = capturedMime.includes("mp4") ? "m4a" : capturedMime.includes("ogg") ? "ogg" : "webm";
+      const file = new File([blob], `voice-${seconds}s.${ext}`, { type: capturedMime });
+
+      setSending(true);
+      setUploading(true);
+      try {
+        const up = await uploadChatFile(file);
+        const res = await chatApi.send(capturedConv, {
+          text: "",
+          attachments: [up.url],
+          attachmentType: "voice",
+        });
+        appendMessage(res.data?.message);
+      } catch (err) {
+        console.error(err);
+        showToast(err?.response?.data?.message || "Voice message could not be sent", "error");
+      } finally {
+        setUploading(false);
+        setSending(false);
+      }
+    };
+
+    try {
+      rec.start(250);
+    } catch {
+      stopMicTracks();
+      try {
+        voiceCleanupRef.current?.();
+      } catch {
+        /* ignore */
+      }
+      voiceCleanupRef.current = null;
+      recorderRef.current = null;
+      showToast("Could not start recording", "error");
+      return;
+    }
+    setRecording(true);
+    setRecordSec(0);
+    recordTimerRef.current = setInterval(() => {
+      setRecordSec((s) => (s < 3600 ? s + 1 : s));
+    }, 1000);
+  };
+
+  // Hard cap a voice note at 3 minutes so uploads stay small.
+  useEffect(() => {
+    if (recording && recordSec >= 180) stopRecording(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recording, recordSec]);
+
+  // Leaving/switching a conversation clears the composer previews and stops
+  // any invisible recording that would otherwise keep the mic open.
+  useEffect(() => {
+    if (recorderRef.current) stopRecording(true);
+    if (pendingImageRef.current) clearPendingImage();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeId]);
+
+  // Release the microphone + object URLs when the screen unmounts.
+  useEffect(
+    () => () => {
+      if (recordTimerRef.current) clearInterval(recordTimerRef.current);
+      const rec = recorderRef.current;
+      if (rec && rec.state !== "inactive") {
+        try {
+          rec.onstop = null;
+          rec.stop();
+        } catch {
+          /* ignore */
+        }
+      }
+      try {
+        recordStreamRef.current?.getTracks().forEach((t) => t.stop());
+      } catch {
+        /* ignore */
+      }
+      try {
+        voiceCleanupRef.current?.();
+      } catch {
+        /* ignore */
+      }
+      voiceCleanupRef.current = null;
+      const p = pendingImageRef.current;
+      if (p?.url) URL.revokeObjectURL(p.url);
+    },
+    [],
+  );
+
   const sendMessage = async (e) => {
     e.preventDefault();
     if (lockedGroup) {
       setShowSubscribe(true);
       return;
     }
+    if (sending || uploading || recording) return;
     const content = text.trim();
-    if (!content || !activeId || sending) return;
+    const image = pendingImage;
+    if ((!content && !image) || !activeId) return;
+
+    const convId = activeId;
     setSending(true);
     setText("");
     try {
-      const res = await chatApi.send(activeId, { text: content });
-      const msg = res.data?.message;
-      if (msg) {
-        setMessages((prev) => {
-          if (prev.some((m) => m._id === msg._id)) return prev;
-          return [...prev, msg];
-        });
+      let payload = { text: content };
+      if (image) {
+        setUploading(true);
+        const up = await uploadChatFile(image.file);
+        payload = { text: content, attachments: [up.url], attachmentType: up.type || "image" };
       }
-    } catch (e) {
-      console.error(e);
-      setText(content);
-      showToast(e?.response?.data?.message || "Message could not be sent", "error");
+      const res = await chatApi.send(convId, payload);
+      appendMessage(res.data?.message);
+      if (image) clearPendingImage();
+    } catch (err) {
+      console.error(err);
+      if (content) setText(content);
+      showToast(err?.response?.data?.message || "Message could not be sent", "error");
     } finally {
+      setUploading(false);
       setSending(false);
     }
   };
@@ -1637,7 +2059,7 @@ export default function Chat() {
             </div>
           )}
           <audio ref={remoteAudioRef} autoPlay playsInline className="hidden" />
-          <div ref={messagesContainerRef} className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 space-y-4 overflow-x-hidden">
+          <div ref={messagesContainerRef} className="chat-scroll flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 space-y-4 overflow-x-hidden">
             {loading && (
               <div className="space-y-3">
                 <Skeleton className="h-12 w-2/3" />
@@ -1651,6 +2073,10 @@ export default function Chat() {
               // Day separator: show when this group starts a new calendar day
               const firstMsgTime = new Date(group.messages[0]?.createdAt || Date.now());
               const prevGroupLast = gi > 0 ? grouped[gi - 1].messages[grouped[gi - 1].messages.length - 1] : null;
+              // Call-history notes must sit dead-centre of the whole thread, not
+              // right/left-aligned like a chat bubble — so this group gets the
+              // full row width and the messages keep their own 85% cap.
+              const groupHasCallLog = group.messages.some((m) => m.callMeta?.status);
               const showDaySep =
                 !prevGroupLast ||
                 firstMsgTime.toDateString() !== new Date(prevGroupLast.createdAt).toDateString();
@@ -1668,20 +2094,22 @@ export default function Chat() {
                 <div
                   className={`flex ${isMe ? "justify-end" : "justify-start"}`}
                 >
-                  <div className="max-w-[85%] sm:max-w-[75%]">
+                  <div className={groupHasCallLog ? "w-full" : "max-w-[85%] sm:max-w-[75%]"}>
                     <div className="space-y-1">
                       {group.messages.map((m) =>
-                        m.callMeta?.status ? (
-                          /* Call-history bubble (centered pill) — labels follow
+                        m.callMeta?.status || isLegacyCallText(m.text) ? (
+                          /* Call-history note (centered system text) — labels follow
                              the viewer's perspective: the caller sees
                              "Declined"/"No answer", the receiver sees "Missed". */
                           (() => {
-                            const meta = m.callMeta;
+                            const meta = m.callMeta || {};
                             const isVideo = meta.callType === "video";
                             const kindLabel = isVideo ? "Video" : "Voice";
                             const isCaller = String(m.sender?._id || m.sender) === String(user?._id);
                             let label;
-                            if (meta.status === "completed") {
+                            if (!meta.status) {
+                              label = String(m.text || "").trim();
+                            } else if (meta.status === "completed") {
                               const d = fmtDur(meta.durationSec);
                               label = `${kindLabel} call${d ? ` · ${d}` : ""}`;
                             } else if (isCaller) {
@@ -1697,7 +2125,7 @@ export default function Chat() {
                               /* Borderless tiny centered text — no icons, no
                                  inline clock. Hover reveals the send time
                                  (desktop only) beside the note. */
-                              <div key={m._id} className="flex justify-center py-0.5">
+                              <div key={m._id} className="flex w-full justify-center py-0.5 px-3">
                                 <span
                                   title={stamp}
                                   className="group/call relative inline-flex items-center select-none text-[10px] leading-none text-slate-400"
@@ -1742,7 +2170,13 @@ export default function Chat() {
                               <FiX size={15} />
                             </button>
                           </div>
-                        ) : (
+                        ) : (() => {
+                          const hasMedia = Array.isArray(m.attachments) && m.attachments.length > 0;
+                          const hasText = !!String(m.text || "").trim();
+                          // Photos/videos sit flush — no bubble frame or padding,
+                          // so no coloured border shows around the image.
+                          const flushMedia = hasMedia && !hasText && m.attachmentType !== "voice" && m.attachmentType !== "file";
+                          return (
                           <div
                             key={m._id}
                             className={`group/msg relative flex items-end gap-2 ${isMe ? "justify-end" : ""}`}
@@ -1779,7 +2213,7 @@ export default function Chat() {
                                 )}
                               </div>
                             )}
-                            <div className="flex flex-col min-w-0">
+                            <div className={`flex flex-col min-w-0 ${groupHasCallLog ? "max-w-[85%] sm:max-w-[75%]" : ""}`}>
                               {!isMe && activeConv?.type === "group" && (
                                 <span className="text-[10px] font-semibold text-slate-500 mb-0.5 ml-1">
                                   {group.sender?.fullname}
@@ -1796,15 +2230,32 @@ export default function Chat() {
                                     e.preventDefault();
                                     setReactPickerFor(m._id);
                                   }}
-                                  className={`px-3.5 py-1.5 text-[13px] leading-snug rounded-[18px] transition select-none break-words ${
-                                    isMe
-                                      ? "bg-brand text-white rounded-br-md"
-                                      : "bg-slate-100 text-slate-800 rounded-bl-md"
+                                  className={`text-[13px] leading-snug rounded-[18px] transition select-none break-words ${
+                                    flushMedia
+                                      ? "p-0 bg-transparent"
+                                      : hasMedia
+                                        ? (m.attachmentType === "voice" ? "p-2" : "p-1")
+                                        : "px-3.5 py-1.5"
+                                  } ${
+                                    flushMedia
+                                      ? ""
+                                      : isMe
+                                        ? "bg-brand text-white rounded-br-md"
+                                        : "bg-slate-100 text-slate-800 rounded-bl-md"
                                   }`}
                                 >
-                                  {m.text}
+                                  {hasMedia && (
+                                    <MessageAttachments
+                                      message={m}
+                                      isMe={isMe}
+                                      ignoreNextClickRef={swallowNextClickRef}
+                                    />
+                                  )}
+                                  {!!String(m.text || "").trim() && (
+                                    <span className={hasMedia ? "block px-1.5 py-1" : ""}>{m.text}</span>
+                                  )}
                                   {m.editedAt && (
-                                    <span className="ml-1.5 text-[10px] opacity-70 align-middle">
+                                    <span className={`text-[10px] opacity-70 align-middle ${hasMedia ? "px-1.5" : "ml-1.5"}`}>
                                       (edited)
                                     </span>
                                   )}
@@ -1827,7 +2278,7 @@ export default function Chat() {
                                     </button>
                                     {msgMenuId === m._id && (
                                       <div className={`absolute top-full mt-1 w-28 bg-white rounded-xl neo-menu border py-1 text-sm shadow ${isMe ? "right-0" : "left-0"}`}>
-                                        {isMe && (
+                                        {isMe && !hasMedia && (
                                           <button
                                             onClick={() => {
                                               setMsgMenuId(null);
@@ -1889,7 +2340,7 @@ export default function Chat() {
                                     {(isMe || isAdmin) && (
                                       <>
                                         <span className="w-px self-stretch bg-slate-200 mx-0.5" />
-                                        {isMe && (
+                                        {isMe && !hasMedia && (
                                           <button
                                             onPointerDown={(e) => e.stopPropagation()}
                                             onClick={() => {
@@ -1965,7 +2416,8 @@ export default function Chat() {
                               </span>
                             </div>
                           </div>
-                        ),
+                          );
+                        })(),
                       )}
                     </div>
                   </div>
@@ -1987,20 +2439,117 @@ export default function Chat() {
               </button>
             </div>
           ) : (
-            <form onSubmit={sendMessage} className="p-4 border-t flex gap-2 shrink-0">
-              <input
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                placeholder="Type a message..."
-                className="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-brand bg-slate-50"
-              />
-              <button
-                type="submit"
-                disabled={sending || !text.trim()}
-                className="px-4 py-2 rounded-lg bg-brand text-white font-semibold hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {sending ? "Sending..." : "Send"}
-              </button>
+            <form onSubmit={sendMessage} className="border-t shrink-0">
+              {pendingImage && !recording && (
+                <div className="px-3 sm:px-4 pt-3 flex items-center gap-2">
+                  <div className="relative shrink-0">
+                    <img
+                      src={pendingImage.url}
+                      alt="Selected attachment preview"
+                      className="h-14 w-14 rounded-xl object-cover border border-slate-200"
+                    />
+                    <button
+                      type="button"
+                      onClick={clearPendingImage}
+                      title="Remove photo"
+                      aria-label="Remove photo"
+                      className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-slate-800 text-white flex items-center justify-center shadow hover:bg-slate-700 transition"
+                    >
+                      <FiX size={12} />
+                    </button>
+                  </div>
+                  <p className="text-xs text-slate-500 truncate min-w-0 flex-1">
+                    {uploading ? "Uploading photo…" : `${pendingImage.file.name} · ready to send`}
+                  </p>
+                </div>
+              )}
+
+              <div className="p-3 sm:p-4 flex items-end gap-2">
+                {recording ? (
+                  <div className="flex flex-1 items-center gap-2 min-w-0 rounded-xl bg-rose-50 border border-rose-200 px-3 py-2">
+                    <span className="relative flex h-2.5 w-2.5 shrink-0">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
+                      <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-rose-500" />
+                    </span>
+                    <span className="text-xs font-semibold text-rose-600 tabular-nums">
+                      {fmtTime(recordSec)}
+                    </span>
+                    <span className="text-xs text-rose-500/80 truncate min-w-0 flex-1">Recording…</span>
+                    <button
+                      type="button"
+                      onClick={() => stopRecording(true)}
+                      title="Cancel recording"
+                      aria-label="Cancel recording"
+                      className="shrink-0 p-1.5 rounded-full text-rose-600 hover:bg-rose-100 transition"
+                    >
+                      <FiX size={16} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => stopRecording(false)}
+                      title="Send voice message"
+                      aria-label="Send voice message"
+                      className="shrink-0 p-1.5 rounded-full bg-rose-600 text-white hover:bg-rose-700 transition"
+                    >
+                      <FiSend size={15} />
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={pickImage}
+                      className="hidden"
+                      aria-label="Attach a photo"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploading || sending}
+                      title="Send a photo"
+                      aria-label="Send a photo"
+                      className="shrink-0 p-2.5 rounded-full text-slate-600 hover:bg-indigo-50 hover:text-brand transition disabled:opacity-40"
+                    >
+                      <FiImage size={20} />
+                    </button>
+
+                    <input
+                      value={text}
+                      onChange={(e) => setText(e.target.value)}
+                      placeholder={pendingImage ? "Add a caption..." : "Type a message..."}
+                      className="flex-1 min-w-0 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-brand bg-slate-50 text-sm"
+                    />
+
+                    {text.trim() || pendingImage ? (
+                      <button
+                        type="submit"
+                        disabled={sending || uploading}
+                        title="Send message"
+                        aria-label="Send message"
+                        className="shrink-0 h-10 w-10 rounded-full bg-brand text-white flex items-center justify-center hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {sending || uploading ? (
+                          <span className="h-4 w-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+                        ) : (
+                          <FiSend size={17} />
+                        )}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={startRecording}
+                        title="Record a voice message"
+                        aria-label="Record a voice message"
+                        className="shrink-0 h-10 w-10 rounded-full bg-brand text-white flex items-center justify-center hover:bg-indigo-700 transition"
+                      >
+                        <LuMic size={18} />
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
             </form>
           )}
         </div>
