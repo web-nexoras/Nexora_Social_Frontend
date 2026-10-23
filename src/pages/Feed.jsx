@@ -600,13 +600,28 @@ export default function Feed() {
                 <button
                   onClick={() => handleReact(post, post.myReaction || "like")}
                   title={post.myReaction ? "Remove reaction" : "Like"}
-                  className="flex flex-1 min-w-0 items-center justify-center gap-1.5 rounded-lg py-2 hover:bg-slate-100 transition"
+                  className="group/react flex flex-1 min-w-0 items-center justify-center gap-1.5 rounded-lg py-2 hover:bg-slate-100 transition"
                 >
-                  <span className="text-[17px] leading-none">{EMOJI[post.myReaction || "like"]}</span>
+                  {/* React না দেওয়া থাকলে icon পুরোপুরি GRAY (কোনো রঙ নেই),
+                      কিন্তু 충분히 স্পষ্ট — যাতে দেখেই বোঝা যায় react দেওয়া
+                      হয়নি। React দিলে full রঙিন ও উজ্জ্বল হয়ে আলাদা হয়। */}
+                  <span
+                    className={`text-[17px] leading-none transition-all duration-150 ${
+                      post.myReaction
+                        ? ""
+                        : "opacity-80 grayscale group-hover/react:opacity-100 group-hover/react:grayscale-0"
+                    }`}
+                  >
+                    {EMOJI[post.myReaction || "like"]}
+                  </span>
                   {totalReactions > 0 && (
                     <span className="text-xs font-semibold text-slate-600 tabular-nums">{totalReactions}</span>
                   )}
-                  <span className="hidden md:inline text-[13px] font-medium">
+                  <span
+                    className={`hidden md:inline text-[13px] ${
+                      post.myReaction ? "reaction-active" : "reaction-idle"
+                    }`}
+                  >
                     {post.myReaction ? "Liked" : "Like"}
                   </span>
                 </button>

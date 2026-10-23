@@ -3,15 +3,19 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Nexora Social</title>
+    <title>Nexoras Social</title>
     <script>
-      // Apply saved theme before first paint to avoid a flash
+      // Default is ALWAYS light. Dark is applied only when the user explicitly
+      // chose it (Sidebar → Appearance). We never consult prefers-color-scheme,
+      // so the OS switching to dark can never flip the app on its own.
       try {
         if (localStorage.getItem("theme") === "dark") {
           document.documentElement.classList.add("dark");
+        } else {
+          document.documentElement.classList.remove("dark");
         }
       } catch {
-        // Continue with the default light theme when browser storage is blocked.
+        // Storage blocked — stay on the default light theme.
       }
     </script>
   </head>

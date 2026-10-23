@@ -74,6 +74,51 @@ body {
   color: #9aa1ad;
 }
 
+/* Dark mode: the neomorphic inset shadow on inputs reads as a dirty smudge on
+   the dark surface, and the focus ring is far too bright. Use a flat, darker
+   field with a clean grey border instead — text stays clearly legible. */
+.dark .neo-input {
+  background: #171a1f;
+  border-color: #3f4652;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.45);
+  color: #f1f5f9;
+}
+
+.dark .neo-input::placeholder {
+  color: #7b8494;
+}
+
+.dark .neo-input:focus {
+  border-color: #6b7688;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.45), 0 0 0 2px rgba(148, 163, 184, 0.28);
+}
+
+/* Error state on dark: a faint rose tint disappears into the dark field.
+   Use a visible rose border + ring and keep the text light. */
+.dark .neo-input.border-rose-500,
+.dark .neo-input[class*="border-rose-500"] {
+  background: #241a1e;
+  border-color: #b4546a;
+  color: #fecdd3;
+  box-shadow: 0 0 0 1px rgba(190, 90, 110, 0.45);
+}
+
+/* Alert / error banners: the pastel rose surface turns into a glaring block
+   on dark backgrounds. Use a deep tinted panel with readable rose text. */
+.dark .bg-rose-50 {
+  background-color: #2b1d22;
+  border-color: #5d3540;
+}
+.dark .border-rose-200 {
+  border-color: #5d3540;
+}
+.dark .text-rose-600 {
+  color: #fda4af;
+}
+.dark .bg-rose-50 .text-rose-600 {
+  color: #fda4af;
+}
+
 .neo-input:focus {
   outline: none;
   border-color: #9aa3af;
@@ -137,6 +182,13 @@ select:not(.neo-input):focus {
 .dark .text-slate-600 { color: #9ca3af; }
 .dark .text-slate-500 { color: #9ca3af; }
 .dark .text-slate-400 { color: #6b7280; }
+
+/* Feed reaction label — needs a clear "reacted vs not" difference in BOTH
+   themes. Not reacted stays muted; reacted stays bright and bold. */
+.dark .reaction-idle { color: #8b93a1; }
+.dark .reaction-active { color: #e5e7eb; font-weight: 700; }
+.reaction-idle { color: #64748b; font-weight: 500; }
+.reaction-active { color: #1e293b; font-weight: 700; }
 
 /* Surfaces & blocks */
 .dark .bg-white { background-color: var(--neo-bg); }

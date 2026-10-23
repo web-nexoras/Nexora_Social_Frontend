@@ -3,12 +3,10 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { usersApi } from "../api/usersApi";
 import { useToast } from "../context/ToastContext";
-import { useTheme } from "../context/ThemeContext";
-import { FiMenu, FiSearch, FiSun, FiMoon } from "react-icons/fi";
+import { FiMenu, FiSearch } from "react-icons/fi";
 
 export default function Topbar({ onMenuClick }) {
   const { user, logout } = useAuth();
-  const { theme, toggleTheme } = useTheme();
   const { showToast } = useToast();
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
@@ -159,16 +157,6 @@ export default function Topbar({ onMenuClick }) {
 
       {user && (
         <div className="flex items-center gap-3 shrink-0">
-          {/* Quick light/dark toggle — always reachable, even on mobile
-              where the sidebar lives behind the menu drawer */}
-          <button
-            onClick={toggleTheme}
-            title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-            aria-label="Toggle light or dark mode"
-            className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300 transition"
-          >
-            {theme === "dark" ? <FiSun className="h-5 w-5" /> : <FiMoon className="h-5 w-5" />}
-          </button>
           <div className="hidden sm:flex flex-col text-right">
             <span className="text-sm font-semibold text-slate-800">{user.fullname}</span>
             <span className="text-xs text-slate-400">{user.email}</span>
