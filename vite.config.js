@@ -13,6 +13,26 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    // Pre-bundle every dependency up front. Without this Vite discovers the
+    // deps that only lazy pages import (react-icons, socket.io, auth0) lazily
+    // on the first request, which stalls the first page load and then forces a
+    // full page reload ("new dependencies optimized") — the app restarts and
+    // the user watches the loader twice before reaching Sign In.
+    optimizeDeps: {
+      include: [
+        "react",
+        "react-dom",
+        "react-dom/client",
+        "react/jsx-runtime",
+        "react/jsx-dev-runtime",
+        "react-router-dom",
+        "axios",
+        "socket.io-client",
+        "@auth0/auth0-react",
+        "react-icons/fi",
+        "react-icons/lu",
+      ],
+    },
     build: {
       rollupOptions: {
         output: {
@@ -36,6 +56,18 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 3000,
       host: true,
+      // Transform the entry + the first routes as soon as the server boots, in
+      // the background. The browser then receives already-compiled modules
+      // instead of waiting for Vite to compile them on demand.
+      warmup: {
+        clientFiles: [
+          "./src/main.jsx",
+          "./src/App.jsx",
+          "./src/components/DashboardShell.jsx",
+          "./src/pages/Home.jsx",
+          "./src/pages/Login.jsx",
+        ],
+      },
       proxy: {
         "/api": {
           target: apiTarget,

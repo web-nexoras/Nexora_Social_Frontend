@@ -38,8 +38,6 @@ export default function Groups() {
     navigate(`/chat?conversation=${convId}`);
   };
 
-  if (loading) return <div className="mt-6 space-y-3"><Skeleton className="h-16 w-full" count={4} /></div>;
-
   return (
     <div className="mt-6">
       <div className="flex items-center justify-between mb-6">
@@ -52,6 +50,7 @@ export default function Groups() {
       </div>
       {msg && <p className="text-sm text-red-500 mb-4">{msg}</p>}
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {loading && groups.length === 0 && <Skeleton className="h-44 w-full rounded-2xl" count={6} />}
         {groups.map((g) => (
           <div key={g._id} className="bg-white rounded-2xl shadow p-5 flex flex-col">
             <div className="flex-1">
@@ -85,7 +84,7 @@ export default function Groups() {
           </div>
         ))}
       </div>
-      {groups.length === 0 && !msg && <p className="text-center text-slate-500 mt-10">No groups available</p>}
+      {!loading && groups.length === 0 && !msg && <p className="text-center text-slate-500 mt-10">No groups available</p>}
     </div>
   );
 }

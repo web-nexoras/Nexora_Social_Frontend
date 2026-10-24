@@ -1030,17 +1030,17 @@ export default function Feed() {
         </div>
       )}
 
+      {loading && posts.length === 0 && (
+        <div className="space-y-4">
+          <Skeleton className="h-48 w-full rounded-2xl" count={3} />
+        </div>
+      )}
+      {!loading && posts.length === 0 && <p className="text-center text-slate-500">No posts yet. Be the first!</p>}
       {hasMore && (
         <button onClick={() => loadFeed(cursor)} disabled={loading} className="w-full py-2 rounded-lg bg-slate-100 hover:bg-slate-200">
           {loading ? "Loading..." : "Load more"}
         </button>
       )}
-      {loading && posts.length === 0 && (
-        <div className="space-y-4">
-          <Skeleton className="h-48 w-full" count={3} />
-        </div>
-      )}
-      {!loading && posts.length === 0 && <p className="text-center text-slate-500">No posts yet. Be the first!</p>}
     </div>
   );
 }

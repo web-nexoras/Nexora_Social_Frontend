@@ -218,6 +218,7 @@ export default function Chat() {
   const isAdmin = user?.role === "admin";
 
   const [conversations, setConversations] = useState([]);
+  const [conversationsLoading, setConversationsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
@@ -367,6 +368,8 @@ export default function Chat() {
       setConversations(res.data?.conversations || []);
     } catch (e) {
       showToast(e?.response?.data?.message || "Could not load conversations", "error");
+    } finally {
+      setConversationsLoading(false);
     }
   };
 
@@ -1758,7 +1761,20 @@ export default function Chat() {
           )}
 
           <p className="text-xs font-semibold text-slate-500 uppercase mb-2">Conversations</p>
-          {conversations.length === 0 && !searchQuery.trim() && (
+          {conversationsLoading && conversations.length === 0 && (
+            <div className="space-y-1">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-3 p-3">
+                  <Skeleton className="w-10 h-10 rounded-full shrink-0" />
+                  <div className="flex-1 min-w-0 space-y-2">
+                    <Skeleton className="h-3 w-1/3" />
+                    <Skeleton className="h-3 w-2/3" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {!conversationsLoading && conversations.length === 0 && !searchQuery.trim() && (
             <p className="text-slate-500 text-sm">No conversations yet</p>
           )}
           {conversations.map((c) => {

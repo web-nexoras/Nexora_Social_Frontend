@@ -3,19 +3,12 @@ import { Outlet } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
 import AdminChatFab from "./AdminChatFab";
-import PageLoader from "./PageLoader";
+import { PageContentSkeleton } from "./PageLoader";
 
 export default function DashboardShell() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // The Suspense boundary sits ABOVE the whole shell: while a lazy page chunk
-  // downloads, the sidebar / topbar / floating button are not mounted at all —
-  // only the full-screen skeleton is visible.
-  return (
-    <Suspense fallback={<PageLoader />}>
-      <ShellInner sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
-    </Suspense>
-  );
+  return <ShellInner sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />;
 }
 
 /* h-screen + overflow-hidden = ONLY the <main> scrolls. Sidebar and
@@ -45,7 +38,12 @@ function ShellInner({ sidebarOpen, setSidebarOpen }) {
       <div className="flex-1 flex flex-col min-w-0">
         <Topbar onMenuClick={() => setSidebarOpen(true)} />
         <main className="flex-1 min-h-0 p-4 sm:p-6 overflow-y-auto">
-          <Outlet />
+          {/* The Suspense boundary wraps ONLY the page content: while a lazy
+              page chunk downloads the sidebar / topbar stay mounted and just
+              the <main> area shows the skeleton. */}
+          <Suspense fallback={<PageContentSkeleton />}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
 

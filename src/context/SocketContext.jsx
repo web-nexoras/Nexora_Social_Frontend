@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useRef, useState } from "react";
+import React, { createContext, useContext, useEffect, useRef, useState, lazy, Suspense } from "react";
 import { useAuth } from "./AuthContext";
 import { useNavigate } from "react-router-dom";
 import { io } from "socket.io-client";
@@ -6,7 +6,10 @@ import { FiBell } from "react-icons/fi";
 import { getAuthToken, setAuthToken } from "../utils/authToken";
 import { SOCKET_URL } from "../api/config";
 import api from "../api/axios";
-import IncomingCallOverlay from "../components/IncomingCallOverlay";
+
+// The call overlay (and its react-icons/lu icons) is only needed when a call
+// actually rings. Loading it lazily keeps it out of the first paint.
+const IncomingCallOverlay = lazy(() => import("../components/IncomingCallOverlay"));
 
 const SocketContext = createContext({
   socket: null,
@@ -445,7 +448,13 @@ export function SocketProvider({ children }) {
       }}
     >
       {children}
-      <IncomingCallOverlay />
+      {/* Mounted only while a call is ringing, so the lazy chunk (and its
+          icons) is fetched on demand instead of on every page load. */}
+      {incomingCall && (
+        <Suspense fallback={null}>
+          <IncomingCallOverlay />
+        </Suspense>
+      )}
       {toast && (
         <div
           onClick={() => goToChat(toast.convId)}

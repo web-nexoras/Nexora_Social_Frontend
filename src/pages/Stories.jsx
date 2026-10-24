@@ -91,12 +91,10 @@ export default function Stories() {
             </div>
           );
         })}
+        {/* Skeleton cards live INSIDE the same horizontal row so the tray
+            keeps its shape while the stories load. */}
+        {loading && stories.length === 0 && <Skeleton className="shrink-0 w-28 h-44 rounded-2xl" count={4} />}
       </div>
-      {loading && (
-        <div className="flex gap-4 overflow-hidden pb-4">
-          <Skeleton className="shrink-0 w-28 h-44 rounded-2xl" count={4} />
-        </div>
-      )}
       {!loading && stories.length === 0 && <p className="text-slate-500">No stories yet.</p>}
     </div>
   );

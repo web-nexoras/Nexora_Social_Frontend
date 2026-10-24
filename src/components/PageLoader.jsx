@@ -19,3 +19,17 @@ export default function PageLoader() {
     </div>
   );
 }
+
+// Skeleton for the PAGE CONTENT only. Used inside the dashboard shell and the
+// public navbar layout: the sidebar / topbar / navbar stay mounted and only
+// the <Outlet /> area shimmers, so navigating between routes never makes the
+// app chrome disappear and reappear.
+export function PageContentSkeleton() {
+  return (
+    <div className="mx-auto w-full max-w-3xl space-y-4">
+      <Skeleton className="h-8 w-40" />
+      <Skeleton className="h-24 w-full rounded-2xl" />
+      <Skeleton className="h-40 w-full rounded-2xl" count={2} />
+    </div>
+  );
+}

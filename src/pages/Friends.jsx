@@ -108,8 +108,6 @@ export default function Friends() {
     }
   };
 
-  if (loading) return <div className="mt-6 space-y-3"><Skeleton className="h-12 w-full" count={5} /></div>;
-
   return (
     <div className="grid md:grid-cols-4 gap-6 mt-6">
       {/* Sidebar tabs */}
@@ -138,7 +136,10 @@ export default function Friends() {
 
       {/* Main content based on active tab */}
       <main className="md:col-span-3">
-        {activeTab === "Suggestions" && (
+        {/* Skeleton replaces the tab content while it loads — the tabs sidebar
+            and its request counters stay visible. */}
+        {loading && <Skeleton className="h-28 w-full rounded-2xl" count={4} />}
+        {!loading && activeTab === "Suggestions" && (
           <section>
             <h2 className="text-2xl font-bold text-brand mb-4">
               {searchQuery ? `Search results for "${searchQuery}"` : "Suggestions"}
@@ -163,7 +164,7 @@ export default function Friends() {
           </section>
         )}
 
-        {activeTab === "Incoming" && (
+        {!loading && activeTab === "Incoming" && (
           <section>
             <h2 className="text-2xl font-bold text-brand mb-4">Incoming Requests</h2>
             {incoming.length === 0 && <p className="text-slate-500 text-sm">No incoming requests</p>}
@@ -191,7 +192,7 @@ export default function Friends() {
           </section>
         )}
 
-        {activeTab === "Sent" && (
+        {!loading && activeTab === "Sent" && (
           <section>
             <h2 className="text-2xl font-bold text-brand mb-4">Sent Requests</h2>
             {sent.length === 0 && <p className="text-slate-500 text-sm">No sent requests</p>}
@@ -214,7 +215,7 @@ export default function Friends() {
           </section>
         )}
 
-        {activeTab === "Friends" && (
+        {!loading && activeTab === "Friends" && (
           <section>
             <h2 className="text-2xl font-bold text-brand mb-4">Friends</h2>
             {friends.length === 0 && <p className="text-slate-500 text-sm">No friends yet</p>}

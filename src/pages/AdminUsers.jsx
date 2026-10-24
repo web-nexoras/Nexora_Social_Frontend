@@ -106,8 +106,6 @@ export default function AdminUsers() {
         ))}
       </div>
 
-      {loading && <div className="space-y-2"><Skeleton className="h-10 w-full" count={6} /></div>}
-
       <div className="bg-white rounded-2xl shadow overflow-x-auto">
         <table className="w-full text-sm min-w-[640px]">
           <thead className="bg-slate-50">
@@ -165,7 +163,12 @@ export default function AdminUsers() {
             })}
           </tbody>
         </table>
-        {users.length === 0 && <p className="text-center text-slate-500 py-6">No users found</p>}
+        {/* Skeleton rows render inside the table card, right where the rows
+            will appear, and the empty state only shows once loading is done. */}
+        {loading && users.length === 0 && (
+          <div className="space-y-2 p-4"><Skeleton className="h-10 w-full" count={6} /></div>
+        )}
+        {!loading && users.length === 0 && <p className="text-center text-slate-500 py-6">No users found</p>}
       </div>
     </div>
   );

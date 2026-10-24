@@ -248,7 +248,14 @@ export default function PaymentHistory() {
   const activeCount = dedupedSubs.filter((s) => s.status === "active" && !s.isExpired).length;
   const pendingCount = dedupedSubs.filter((s) => s.status === "pending").length;
 
-  if (loading) return <div className="mt-6 space-y-3"><Skeleton className="h-12 w-full" count={5} /></div>;
+  // Same 2-column card grid as the real subscriptions, so nothing jumps in.
+  if (loading) {
+    return (
+      <div className="mt-6 grid gap-4 md:grid-cols-2">
+        <Skeleton className="h-40 w-full rounded-2xl" count={4} />
+      </div>
+    );
+  }
 
   return (
     <div className="mt-6 space-y-10">

@@ -86,7 +86,9 @@ export default function Notifications() {
         )}
       </div>
 
-      {loading && <div className="space-y-3"><Skeleton className="h-16 w-full" count={5} /></div>}
+      {loading && notifications.length === 0 && (
+        <div className="space-y-3"><Skeleton className="h-16 w-full rounded-xl" count={5} /></div>
+      )}
 
       {!loading && notifications.length === 0 && <p className="text-slate-500 text-sm">No notifications yet</p>}
 

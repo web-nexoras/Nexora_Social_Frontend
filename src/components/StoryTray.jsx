@@ -301,13 +301,12 @@ export default function StoryTray() {
               </button>
             );
           })}
-        </div>
-
-        {loading && (
-          <div className="flex gap-2.5 sm:gap-3 pt-1">
+          {/* Skeleton placeholders sit in the SAME scroll row as the real
+              cards, so the tray never jumps once the stories arrive. */}
+          {loading && friendGroups.length === 0 && (
             <Skeleton className="shrink-0 w-[80px] h-[120px] sm:w-24 sm:h-36 rounded-xl" count={4} />
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* ---------------- Full-screen FB-style viewer ---------------- */}

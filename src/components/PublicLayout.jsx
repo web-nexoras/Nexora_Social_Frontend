@@ -1,18 +1,20 @@
 import React, { Suspense } from "react";
 import { Outlet } from "react-router-dom";
 import Navbar from "./Navbar";
-import PageLoader from "./PageLoader";
+import { PageContentSkeleton } from "./PageLoader";
 
-// While the page chunk is downloading only the full-screen skeleton is shown —
-// the navbar (with its Sign In / Sign Up links) is mounted AFTER that Suspense
-// boundary resolves, so it can never flash before the page content.
+// The navbar stays mounted while a lazy page chunk downloads — only the page
+// body under it shows the skeleton, so the top bar never disappears on a
+// navigation.
 export default function PublicLayout() {
   return (
-    <Suspense fallback={<PageLoader />}>
+    <>
       <Navbar />
       <main className="max-w-6xl mx-auto px-4 py-6">
-        <Outlet />
+        <Suspense fallback={<PageContentSkeleton />}>
+          <Outlet />
+        </Suspense>
       </main>
-    </Suspense>
+    </>
   );
 }

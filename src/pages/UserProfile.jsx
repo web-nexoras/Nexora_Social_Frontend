@@ -74,7 +74,27 @@ export default function UserProfile() {
   };
 
   if (loading) {
-    return <div className="max-w-3xl mx-auto mt-6 px-4 space-y-3"><Skeleton className="h-40 w-full" /><Skeleton className="h-12 w-1/2" /><Skeleton className="h-12 w-full" /></div>;
+    return (
+      <div className="max-w-3xl mx-auto mt-6 px-4 sm:px-0">
+        <div className="bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden">
+          <Skeleton className="h-36 sm:h-40 w-full" />
+          <div className="px-4 sm:px-6 md:px-8 pb-6 sm:pb-8">
+            <div className="-mt-12 sm:-mt-14 mb-5 sm:mb-6 flex items-end gap-3">
+              <Skeleton className="w-24 h-24 sm:w-28 sm:h-28 rounded-full shrink-0" />
+              <div className="flex-1 min-w-0 space-y-2 pb-1">
+                <Skeleton className="h-6 w-1/3" />
+                <Skeleton className="h-4 w-1/4" />
+              </div>
+            </div>
+            <div className="space-y-3">
+              <Skeleton className="h-4 w-2/3" />
+              <Skeleton className="h-4 w-1/2" />
+              <Skeleton className="h-10 w-40 rounded-xl" />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (!user) {

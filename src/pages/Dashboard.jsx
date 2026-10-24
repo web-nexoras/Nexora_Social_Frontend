@@ -255,16 +255,11 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* Stats */}
-      {loading && !isAdmin && (
-        <div className="space-y-4">
-          <Skeleton className="h-24 w-full rounded-2xl" />
-          <Skeleton className="h-40 w-full rounded-2xl" count={2} />
-        </div>
-      )}
-
-      <div className={`grid sm:grid-cols-2 lg:grid-cols-4 gap-4 ${loading ? "opacity-60" : ""}`}>
-        {cards.map((c) => (
+      {/* Stats — skeleton cards inside the SAME grid while the numbers load,
+          so the layout never jumps when the real values arrive. */}
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {loading && <Skeleton className="h-32 w-full rounded-2xl" count={4} />}
+        {!loading && cards.map((c) => (
           <Link
             key={c.label}
             to={c.to}
